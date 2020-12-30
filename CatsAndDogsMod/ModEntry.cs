@@ -99,7 +99,7 @@ namespace CatsAndDogsMod
             }
             newPet.Name = petName;
             newPet.displayName = petName;
-            Game1.getFarm().characters.Add(newPet);
+            // Game1.getFarm().characters.Add(newPet);
             WarpToOwnerFarmHouse(newPet);
             Game1.drawObjectDialogue($"{petName} has been adopted");
             newPet = null;
@@ -243,14 +243,18 @@ namespace CatsAndDogsMod
         /// <returns>List of Pet objects</returns>
         internal static List<Pet> GetAllPets()
         {
+            SMonitor.Log("GetAllPets - Debug", LogLevel.Debug);
             List<Pet> pets = new List<Pet>();
+            SMonitor.Log("Game1.getFarm() pets", LogLevel.Debug);
             foreach (NPC j in Game1.getFarm().characters)
             {
                 if (j is Pet)
                 {
                     pets.Add(j as Pet);
+                    SMonitor.Log($"{j.displayName}: {j.id}, {j.loveInterest}", LogLevel.Debug);
                 }
             }
+            SMonitor.Log("Indoor Pets", LogLevel.Debug);
             foreach (Farmer farmer in Game1.getAllFarmers())
             {
                 foreach (NPC i in Utility.getHomeOfFarmer(farmer).characters)
@@ -258,6 +262,7 @@ namespace CatsAndDogsMod
                     if (i is Pet)
                     {
                         pets.Add(i as Pet);
+                        SMonitor.Log($"{i.displayName}: {i.id}, {i.loveInterest} -- in {farmer.displayName} house", LogLevel.Debug);
                     }
                 }
             }
@@ -268,7 +273,6 @@ namespace CatsAndDogsMod
         /// Initializes newPet to be a cat
         /// </summary>
         /// <param name="breed">breed id for selecting pet texture</param>
-        /// //this.petBowlPosition.X - 1, this.petBowlPosition.Y + 1
         internal static void InitializeCat(int breed)
         {
             newPet = new Cat(0, 0, breed)
