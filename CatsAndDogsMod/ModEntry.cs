@@ -203,7 +203,10 @@ namespace CatsAndDogsMod
         {
             if (pet.loveInterest != null)
             {
-                pet.warpToFarmHouse(allFarmers[pet.loveInterest]);
+                if(allFarmers.ContainsKey(pet.loveInterest))
+                    pet.warpToFarmHouse(allFarmers[pet.loveInterest]);
+                else
+                    pet.warpToFarmHouse(Game1.MasterPlayer);
             }
             else
             {
