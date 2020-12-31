@@ -243,18 +243,14 @@ namespace CatsAndDogsMod
         /// <returns>List of Pet objects</returns>
         internal static List<Pet> GetAllPets()
         {
-            SMonitor.Log("GetAllPets - Debug", LogLevel.Debug);
             List<Pet> pets = new List<Pet>();
-            SMonitor.Log("Game1.getFarm() pets", LogLevel.Debug);
             foreach (NPC j in Game1.getFarm().characters)
             {
                 if (j is Pet)
                 {
                     pets.Add(j as Pet);
-                    SMonitor.Log($"{j.displayName}: {j.id}, {j.loveInterest}", LogLevel.Debug);
                 }
             }
-            SMonitor.Log("Indoor Pets", LogLevel.Debug);
             foreach (Farmer farmer in Game1.getAllFarmers())
             {
                 foreach (NPC i in Utility.getHomeOfFarmer(farmer).characters)
@@ -262,7 +258,6 @@ namespace CatsAndDogsMod
                     if (i is Pet)
                     {
                         pets.Add(i as Pet);
-                        SMonitor.Log($"{i.displayName}: {i.id}, {i.loveInterest} -- in {farmer.displayName} house", LogLevel.Debug);
                     }
                 }
             }

@@ -18,6 +18,12 @@ namespace CatsAndDogsMod.Framework
         /// <param name="args">The arguments entered with the command</param>
         internal static void OnCommandReceived(string command, string[] args)
         {
+            if (!Context.IsMainPlayer)
+            {
+                ModEntry.SMonitor.Log("Only the host can write commands && commands are not currently supported during split-screen multiplayer", LogLevel.Warn);
+                return;
+            }
+                
             var petType = "unknown type";
             var breed = 0;
             var petName = "";
