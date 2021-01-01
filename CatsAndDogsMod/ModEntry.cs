@@ -87,6 +87,7 @@ namespace CatsAndDogsMod
 
         /// <summary>
         /// Adds the pet to the farm
+        /// adds a space to the pet name to avoid conflict with villager names
         /// </summary>
         /// <param name="petName">User-provided name for the pet</param>
         private static void AddPet(string petName)
@@ -97,8 +98,8 @@ namespace CatsAndDogsMod
                 Game1.drawObjectDialogue($"{petName} could not be adopted");
                 return;
             }
-            newPet.Name = petName;
-            newPet.displayName = petName;
+            newPet.Name = petName + " ";
+            newPet.displayName = petName + " ";
             // Game1.getFarm().characters.Add(newPet);
             WarpToOwnerFarmHouse(newPet);
             Game1.drawObjectDialogue($"{petName} has been adopted");
@@ -114,7 +115,7 @@ namespace CatsAndDogsMod
             Pet petToRemove = null;
 
             GetAllPets().ForEach(delegate (Pet pet) {
-                if (pet.displayName == petName)
+                if (pet.displayName.Replace(" ", string.Empty) == petName)
                     petToRemove = pet;
             });
 
@@ -330,10 +331,10 @@ namespace CatsAndDogsMod
             {
                 foreach (Pet pet in GetAllPets())
                 {
-                    if (pet.displayName == petName)
+                    if (pet.displayName.Replace(" ", string.Empty) == petName)
                     {
                         petExists = true;
-                        pet.loveInterest = farmerName; // TODO: bug report: this needs to be saved - isn't stored for next day
+                        pet.loveInterest = farmerName;
                         SMonitor.Log($"{petName}'s new owner is {farmerName}.", LogLevel.Info);
                         break;
                     }
