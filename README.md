@@ -23,13 +23,20 @@ What this mod lets you do
 
 # Example SMAPI Commands
 ### Adding a cat, the number (between 0-2) indicates the breed/skin
+
 `add_cat`
+
 `add_cat 1`
+
 `add_cat 2`
 
+
 ### Adding a dog, the number (between 0-2) indicates the breed/skin
+
 `add_dog`
+
 `add_dog 1`
+
 `add_dog 2`
 
 
