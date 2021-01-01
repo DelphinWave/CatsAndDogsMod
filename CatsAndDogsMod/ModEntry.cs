@@ -100,7 +100,6 @@ namespace CatsAndDogsMod
             }
             newPet.Name = petName + " ";
             newPet.displayName = petName + " ";
-            // Game1.getFarm().characters.Add(newPet);
             WarpToOwnerFarmHouse(newPet);
             Game1.drawObjectDialogue($"{petName} has been adopted");
             newPet = null;
