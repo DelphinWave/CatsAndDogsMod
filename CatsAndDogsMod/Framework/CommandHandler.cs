@@ -18,6 +18,13 @@ namespace CatsAndDogsMod.Framework
         /// <param name="args">The arguments entered with the command</param>
         internal static void OnCommandReceived(string command, string[] args)
         {
+            // ignore if player hasn't loaded a save yet
+            if (!Context.IsWorldReady)
+            {
+                ModEntry.SMonitor.Log("Your farm has not loaded yet, please try command again once farm is loaded", LogLevel.Warn);
+                return;
+            }
+
             if (!Context.IsMainPlayer)
             {
                 ModEntry.SMonitor.Log("Only the host can write commands && commands are not currently supported during split-screen multiplayer", LogLevel.Warn);
