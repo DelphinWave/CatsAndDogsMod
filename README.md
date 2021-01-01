@@ -35,8 +35,10 @@ What this mod lets you do
 
 ### Removing a pet, where PetName is the name of your pet
 *Note, this does not work if your pet has a space in their name*
+
 `remove_pet PetName`
 
-### Giving a pet to a multiplayer farmhand, where `PetName` is the name of the pet and `FarmerName` is the name of the farmhand
+### Giving a pet to a multiplayer farmhand, where PetName is the name of the pet and FarmerName is the name of the farmhand
 *Note, this does not work if the names have spaces*
+
 `give_pet PetName FarmerName`
