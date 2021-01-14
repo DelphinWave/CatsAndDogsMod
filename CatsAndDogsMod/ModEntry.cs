@@ -10,6 +10,8 @@ using StardewValley.Characters;
 using StardewValley.Buildings;
 using StardewValley.Locations;
 using StardewValley.Menus;
+using StardewValley.Objects;
+using CatsAndDogsMod.Framework;
 
 namespace CatsAndDogsMod
 {
@@ -23,6 +25,10 @@ namespace CatsAndDogsMod
     public class ModEntry : Mod
     {
         internal static IMonitor SMonitor;
+        internal static IModHelper SHelper;
+        internal static IManifest SModManifest;
+
+        internal static readonly string PlayerWarpedHomeMessageId = "PlayerHome";
 
         private static Pet newPet;
         private static Farmer player;
@@ -37,18 +43,22 @@ namespace CatsAndDogsMod
         public override void Entry(IModHelper helper)
         {
             ModEntry.SMonitor = Monitor;
+            ModEntry.SHelper = helper;
+            ModEntry.SModManifest = ModManifest;
 
-            helper.Events.Input.ButtonPressed += this.OnButtonPressed;
-            helper.Events.GameLoop.SaveLoaded += this.OnSaveLoaded;
-            helper.Events.GameLoop.DayStarted += this.OnDayStarted;
-            
+            helper.Events.Input.ButtonPressed += OnButtonPressed;
+            helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
+            helper.Events.GameLoop.DayStarted += OnDayStarted;
+            helper.Events.Player.Warped += OnWarped;
+            helper.Events.Multiplayer.ModMessageReceived += OnModMessageReceived;
+
             // SMAPI Commands
-            helper.ConsoleCommands.Add("list_pets", "Lists the names of all pets on your farm.", Framework.CommandHandler.OnCommandReceived);
-            helper.ConsoleCommands.Add("add_cat", "Adds a cat of given breed. Breed is a number between 0-2. This will give you an in-game naming prompt.", Framework.CommandHandler.OnCommandReceived);
-            helper.ConsoleCommands.Add("add_dog", "Adds a dog of given breed. Breed is a number between 0-2. This will give you an in-game naming prompt.", Framework.CommandHandler.OnCommandReceived);
-            helper.ConsoleCommands.Add("remove_pet", "Removes pet of given name from your farm.", Framework.CommandHandler.OnCommandReceived);
-            helper.ConsoleCommands.Add("list_farmers", "Lists the names and Multiplayer ID of all farmers", Framework.CommandHandler.OnCommandReceived);
-            helper.ConsoleCommands.Add("give_pet", "Specify pet name and farmer name that you want to give pet to", Framework.CommandHandler.OnCommandReceived);
+            helper.ConsoleCommands.Add("list_pets", "Lists the names of all pets on your farm.", CommandHandler.OnCommandReceived);
+            helper.ConsoleCommands.Add("add_cat", "Adds a cat of given breed. Breed is a number between 0-2. This will give you an in-game naming prompt.", CommandHandler.OnCommandReceived);
+            helper.ConsoleCommands.Add("add_dog", "Adds a dog of given breed. Breed is a number between 0-2. This will give you an in-game naming prompt.", CommandHandler.OnCommandReceived);
+            helper.ConsoleCommands.Add("remove_pet", "Removes pet of given name from your farm.", CommandHandler.OnCommandReceived);
+            helper.ConsoleCommands.Add("list_farmers", "Lists the names and Multiplayer ID of all farmers", CommandHandler.OnCommandReceived);
+            helper.ConsoleCommands.Add("give_pet", "Specify pet name and farmer name that you want to give pet to", CommandHandler.OnCommandReceived);
             
         }
 
@@ -62,7 +72,6 @@ namespace CatsAndDogsMod
             // ignore if player hasn't loaded a save yet
             if (!Context.IsWorldReady)
                 return;
-
         }
 
         private void OnSaveLoaded(object sender, SaveLoadedEventArgs e)
@@ -84,6 +93,67 @@ namespace CatsAndDogsMod
             }
         }
 
+        private void OnWarped(object sender, WarpedEventArgs e)
+        {
+            Farmer player = e.Player;
+            
+            // If it's earlier than 8 or the warped location isn't the player's farmhouse
+            if(Game1.timeOfDay < 2000 || e.NewLocation != Utility.getHomeOfFarmer(e.Player))
+                return;
+
+            if (!Context.IsMainPlayer)
+            {
+                // Send message to main player
+                SHelper.Multiplayer.SendMessage(
+                    message: new PlayerWarpedMessage(player.UniqueMultiplayerID),
+                    messageType: PlayerWarpedHomeMessageId,
+                    modIDs: new[] { SModManifest.UniqueID }
+                    );
+                return;
+            }
+
+            // Main Player ------------------------------------------
+            HandleTeleportingPetsHomeAtNight(player);
+
+        }
+
+        public void HandleTeleportingPetsHomeAtNight(Farmer player)
+        {
+            if (!isPetOwner(player)) // TODO: make sure that no pets teleported to their house?
+                return;
+
+            bool isAPetOnBed = false;
+
+            foreach (Pet pet in GetAllPets())
+            {
+                if (pet.loveInterest == player.displayName)
+                {
+                    WarpToOwnerFarmHouse(pet);
+                    if (isAPetOnBed)
+                    {
+                        pet.isSleepingOnFarmerBed.Value = false;
+                        WarpPetAgain(pet, player);
+
+                    }
+                    if (pet.isSleepingOnFarmerBed.Value)
+                        isAPetOnBed = true;
+                }
+            }
+        }
+
+        /// <summary> Raised after a mod message is received over the network. </summary>
+        /// <param name="sender">The event sender.</param>
+        /// <param name="e">The event arguments.</param>
+        private void OnModMessageReceived(object sender, ModMessageReceivedEventArgs e)
+        {
+            if (e.Type == PlayerWarpedHomeMessageId && Context.IsMainPlayer && e.FromModID == SModManifest.UniqueID)
+            {
+                PlayerWarpedMessage message = e.ReadAs<PlayerWarpedMessage>();
+                HandleTeleportingPetsHomeAtNight(Game1.getFarmer(message.playerId));
+                return;
+                
+            }
+        }
 
         /// <summary>
         /// Adds the pet to the farm
@@ -149,7 +219,7 @@ namespace CatsAndDogsMod
                 {
                     farmHouse.characters.Remove(petToRemove);
                     Game1.drawObjectDialogue($"{petToRemove.displayName} has been removed");
-                    SMonitor.Log($"{petToRemove.displayName} has been removed", LogLevel.Debug);
+                    SMonitor.Log($"{petToRemove.displayName} has been removed", LogLevel.Info);
                 }
             });
         }
@@ -162,7 +232,7 @@ namespace CatsAndDogsMod
         {
             Game1.getFarm().characters.Remove(petToRemove);
             Game1.drawObjectDialogue($"{petToRemove.displayName} has been removed");
-            SMonitor.Log($"{petToRemove.displayName} has been removed", LogLevel.Debug);
+            SMonitor.Log($"{petToRemove.displayName} has been removed", LogLevel.Info);
         }
 
         /// <summary>
@@ -267,6 +337,30 @@ namespace CatsAndDogsMod
             return pets;
         }
 
+        internal static List<string> GetAllPetOwnerNames()
+        {
+            List<string> ownerNames = new List<string>();
+            foreach(Pet pet in GetAllPets())
+            {
+                if (pet.loveInterest != null && !ownerNames.Contains(pet.loveInterest))
+                {
+                    ownerNames.Add(pet.loveInterest);
+                }
+            }
+
+            return ownerNames;
+        }
+
+        /// <summary>
+        /// helper to determine if a given farmer is a pet owner
+        /// </summary>
+        /// <param name="farmer">farmer object to check</param>
+        /// <returns>true if farmer is a pet owner</returns>
+        internal static bool isPetOwner(Farmer farmer)
+        {
+            return GetAllPetOwnerNames().Contains(farmer.displayName);
+        }
+
         /// <summary>
         /// Initializes newPet to be a cat
         /// </summary>
@@ -351,6 +445,65 @@ namespace CatsAndDogsMod
                 return;
             }
             
+        }
+
+        /// <summary>
+        /// To warp pet to owner's farmhouse and ensure that only 1 pet will sleep on bed, we need to warp pets a second time if there is a pet on bed
+        /// </summary>
+        /// <param name="pet">pet to warp</param>
+        /// <param name="owner">pet owner</param>
+        private void WarpPetAgain(Pet pet, Farmer owner)
+        {
+            pet.isSleepingOnFarmerBed.Value = false;
+            FarmHouse farmHouse = Utility.getHomeOfFarmer(owner);
+            Vector2 sleepTile = Vector2.Zero;
+            int tries = 0;
+            sleepTile = new Vector2(Game1.random.Next(2, farmHouse.map.Layers[0].LayerWidth - 3), Game1.random.Next(3, farmHouse.map.Layers[0].LayerHeight - 5));
+            List<Furniture> rugs = new List<Furniture>();
+            foreach (Furniture house_furniture in farmHouse.furniture)
+            {
+                if ((int)house_furniture.furniture_type == 12)
+                {
+                    rugs.Add(house_furniture);
+                }
+            }
+
+            if (Game1.random.NextDouble() <= 0.30000001192092896)
+            {
+                sleepTile = Utility.PointToVector2(farmHouse.getBedSpot()) + new Vector2(0f, 2f);
+            }
+            else if (Game1.random.NextDouble() <= 0.5)
+            {
+                Furniture rug = Utility.GetRandom(rugs, Game1.random);
+                if (rug != null)
+                {
+                    sleepTile = new Vector2(rug.boundingBox.Left / 64, rug.boundingBox.Center.Y / 64);
+                }
+            }
+            for (; tries < 50; tries++)
+            {
+                if (farmHouse.canPetWarpHere(sleepTile) && farmHouse.isTileLocationTotallyClearAndPlaceable(sleepTile) && farmHouse.isTileLocationTotallyClearAndPlaceable(sleepTile + new Vector2(1f, 0f)) && !farmHouse.isTileOnWall((int)sleepTile.X, (int)sleepTile.Y))
+                {
+                    break;
+                }
+                sleepTile = new Vector2(Game1.random.Next(2, farmHouse.map.Layers[0].LayerWidth - 3), Game1.random.Next(3, farmHouse.map.Layers[0].LayerHeight - 4));
+            }
+            if (tries < 50)
+            {
+                Game1.warpCharacter(pet, farmHouse, sleepTile);
+                pet.CurrentBehavior = 1;
+            }
+            else
+            {
+                SMonitor.Log($"warp pet back to start location", LogLevel.Debug);
+                pet.faceDirection(2);
+                Game1.warpCharacter(pet, "Farm", (Game1.getLocationFromName("Farm") as Farm).GetPetStartLocation());
+            }
+            pet.UpdateSleepingOnBed();
+            pet.Halt();
+            pet.Sprite.CurrentAnimation = null;
+            pet.OnNewBehavior();
+            pet.Sprite.UpdateSourceRect();
         }
     }
 }
