@@ -18,7 +18,6 @@ namespace CatsAndDogsMod
     // TODO:
     // - Use better spawning location
     // - Pet portrait update
-    // - Pet sleep in owner's house
     // - Handle ids instead of names to avoid issue with spaces
 
     /// <summary>The mod entry point.</summary>
@@ -29,10 +28,17 @@ namespace CatsAndDogsMod
         internal static IManifest SModManifest;
 
         internal static readonly string PlayerWarpedHomeMessageId = "PlayerHome";
+        internal static bool didPetsWarpHome = false;
 
         private static Pet newPet;
         private static Farmer player;
         private static Dictionary<string, Farmer> allFarmers = new Dictionary<string, Farmer>();
+
+        // Whether the mod is enabled for the current farmhand.
+        internal static bool IsEnabled = true;
+
+        // The minimum version the host must have for the mod to be enabled on a farmhand.
+        private readonly string MinHostVersion = "1.1.0";
 
         /*********
         ** Public methods
@@ -49,8 +55,10 @@ namespace CatsAndDogsMod
             helper.Events.Input.ButtonPressed += OnButtonPressed;
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
+            helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
             helper.Events.Player.Warped += OnWarped;
             helper.Events.Multiplayer.ModMessageReceived += OnModMessageReceived;
+            
 
             // SMAPI Commands
             helper.ConsoleCommands.Add("list_pets", "Lists the names of all pets on your farm.", CommandHandler.OnCommandReceived);
@@ -72,20 +80,46 @@ namespace CatsAndDogsMod
             // ignore if player hasn't loaded a save yet
             if (!Context.IsWorldReady)
                 return;
+
+            if (!IsEnabled)
+                return;
         }
 
         private void OnSaveLoaded(object sender, SaveLoadedEventArgs e)
         {
             player = Game1.player;
+
+            // check if mod should be enabled for the current player
+            IsEnabled = Context.IsMainPlayer;
+            if (!IsEnabled)
+            {
+                ISemanticVersion hostVersion = SHelper.Multiplayer.GetConnectedPlayer(Game1.MasterPlayer.UniqueMultiplayerID)?.GetMod(this.ModManifest.UniqueID)?.Version;
+                if (hostVersion == null)
+                {
+                    IsEnabled = false;
+                    SMonitor.Log("This mod is disabled because the host player doesn't have it installed.", LogLevel.Warn);
+                }
+                else if (hostVersion.IsOlderThan(this.MinHostVersion))
+                {
+                    IsEnabled = false;
+                    SMonitor.Log($"This mod is disabled because the host player has {this.ModManifest.Name} {hostVersion}, but the minimum compatible version is {this.MinHostVersion}.", LogLevel.Warn);
+                }
+                else
+                    IsEnabled = true;
+            }
         }
 
         private void OnDayStarted(object sender, DayStartedEventArgs e)
         {
+            if (!IsEnabled)
+                return;
             if (!Context.IsMainPlayer)
                 return;
             GenerateAllFarmersDict();
+            didPetsWarpHome = false;
             if (Game1.isRaining)
             {
+                didPetsWarpHome = true;
                 foreach(Pet pet in GetAllPets())
                 {
                     WarpToOwnerFarmHouse(pet);
@@ -93,14 +127,24 @@ namespace CatsAndDogsMod
             }
         }
 
+        private void OnUpdateTicked(object sender, UpdateTickedEventArgs e)
+        {
+
+        }
+
         private void OnWarped(object sender, WarpedEventArgs e)
         {
-            Farmer player = e.Player;
-            
-            // If it's earlier than 8 or the warped location isn't the player's farmhouse
-            if(Game1.timeOfDay < 2000 || e.NewLocation != Utility.getHomeOfFarmer(e.Player))
+            if (!IsEnabled)
                 return;
 
+            if (didPetsWarpHome)
+                return;
+
+            if (Game1.timeOfDay < 2000)
+                return;
+
+            Farmer player = e.Player;
+            
             if (!Context.IsMainPlayer)
             {
                 // Send message to main player
@@ -119,26 +163,28 @@ namespace CatsAndDogsMod
 
         public void HandleTeleportingPetsHomeAtNight(Farmer player)
         {
-            if (!isPetOwner(player)) // TODO: make sure that no pets teleported to their house?
+            if (didPetsWarpHome)
+                return;
+
+            if (!isPetOwner(player))
                 return;
 
             bool isAPetOnBed = false;
 
             foreach (Pet pet in GetAllPets())
             {
-                if (pet.loveInterest == player.displayName)
+                WarpToOwnerFarmHouse(pet);
+                if (isAPetOnBed)
                 {
-                    WarpToOwnerFarmHouse(pet);
-                    if (isAPetOnBed)
-                    {
-                        pet.isSleepingOnFarmerBed.Value = false;
-                        WarpPetAgain(pet, player);
+                    pet.isSleepingOnFarmerBed.Value = false;
+                    WarpPetAgain(pet);
 
-                    }
-                    if (pet.isSleepingOnFarmerBed.Value)
-                        isAPetOnBed = true;
                 }
+                if (pet.isSleepingOnFarmerBed.Value)
+                    isAPetOnBed = true;
             }
+
+            didPetsWarpHome = true;
         }
 
         /// <summary> Raised after a mod message is received over the network. </summary>
@@ -452,8 +498,13 @@ namespace CatsAndDogsMod
         /// </summary>
         /// <param name="pet">pet to warp</param>
         /// <param name="owner">pet owner</param>
-        private void WarpPetAgain(Pet pet, Farmer owner)
+        private void WarpPetAgain(Pet pet)
         {
+            Farmer owner = Game1.MasterPlayer;
+            if (pet.loveInterest != null)
+                if (allFarmers.ContainsKey(pet.loveInterest))
+                    owner = allFarmers[pet.loveInterest];
+
             pet.isSleepingOnFarmerBed.Value = false;
             FarmHouse farmHouse = Utility.getHomeOfFarmer(owner);
             Vector2 sleepTile = Vector2.Zero;
@@ -495,7 +546,6 @@ namespace CatsAndDogsMod
             }
             else
             {
-                SMonitor.Log($"warp pet back to start location", LogLevel.Debug);
                 pet.faceDirection(2);
                 Game1.warpCharacter(pet, "Farm", (Game1.getLocationFromName("Farm") as Farm).GetPetStartLocation());
             }

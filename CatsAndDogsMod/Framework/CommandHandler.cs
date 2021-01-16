@@ -18,6 +18,9 @@ namespace CatsAndDogsMod.Framework
         /// <param name="args">The arguments entered with the command</param>
         internal static void OnCommandReceived(string command, string[] args)
         {
+            if (!ModEntry.IsEnabled)
+                return;
+
             // ignore if player hasn't loaded a save yet
             if (!Context.IsWorldReady)
             {
