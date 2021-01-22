@@ -18,7 +18,6 @@ namespace CatsAndDogsMod
     // TODO:
     // - Use better spawning location
     // - Pet portrait update
-    // - Handle ids instead of names to avoid issue with spaces
 
     /// <summary>The mod entry point.</summary>
     public class ModEntry : Mod
@@ -27,39 +26,38 @@ namespace CatsAndDogsMod
         internal static IModHelper SHelper;
         internal static IManifest SModManifest;
 
-        internal static readonly string PlayerWarpedHomeMessageId = "PlayerHome";
-        internal static bool didPetsWarpHome = false;
+        
+        private static bool didPetsWarpHome = false;
 
         private static Pet newPet;
-        private static Farmer player;
         private static Dictionary<string, Farmer> allFarmers = new Dictionary<string, Farmer>();
 
-        // Whether the mod is enabled for the current farmhand.
+
         internal static bool IsEnabled = true;
+
+        
+        // Constants
+        internal static readonly string PlayerWarpedHomeMessageId = "PlayerHome";
 
         // The minimum version the host must have for the mod to be enabled on a farmhand.
         private readonly string MinHostVersion = "1.1.0";
 
-        /*********
-        ** Public methods
-        *********/
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
-            ModEntry.SMonitor = Monitor;
-            ModEntry.SHelper = helper;
-            ModEntry.SModManifest = ModManifest;
+            // Static variables
+            SMonitor = Monitor;
+            SHelper = helper;
+            SModManifest = ModManifest;
 
-            helper.Events.Input.ButtonPressed += OnButtonPressed;
+            // Event handlers
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
-            helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
             helper.Events.Player.Warped += OnWarped;
             helper.Events.Multiplayer.ModMessageReceived += OnModMessageReceived;
             
-
             // SMAPI Commands
             helper.ConsoleCommands.Add("list_pets", "Lists the names of all pets on your farm.", CommandHandler.OnCommandReceived);
             helper.ConsoleCommands.Add("add_cat", "Adds a cat of given breed. Breed is a number between 0-2. This will give you an in-game naming prompt.", CommandHandler.OnCommandReceived);
@@ -67,27 +65,15 @@ namespace CatsAndDogsMod
             helper.ConsoleCommands.Add("remove_pet", "Removes pet of given name from your farm.", CommandHandler.OnCommandReceived);
             helper.ConsoleCommands.Add("list_farmers", "Lists the names and Multiplayer ID of all farmers", CommandHandler.OnCommandReceived);
             helper.ConsoleCommands.Add("give_pet", "Specify pet name and farmer name that you want to give pet to", CommandHandler.OnCommandReceived);
-            
         }
 
         
         /*********
-        ** Private methods
+        ** Event Handlers
         *********/
-
-        private void OnButtonPressed(object sender, ButtonPressedEventArgs e)
-        {
-            // ignore if player hasn't loaded a save yet
-            if (!Context.IsWorldReady)
-                return;
-
-            if (!IsEnabled)
-                return;
-        }
 
         private void OnSaveLoaded(object sender, SaveLoadedEventArgs e)
         {
-            player = Game1.player;
 
             // check if mod should be enabled for the current player
             IsEnabled = Context.IsMainPlayer;
@@ -111,8 +97,6 @@ namespace CatsAndDogsMod
 
         private void OnDayStarted(object sender, DayStartedEventArgs e)
         {
-            if (!IsEnabled)
-                return;
             if (!Context.IsMainPlayer)
                 return;
             GenerateAllFarmersDict();
@@ -125,11 +109,6 @@ namespace CatsAndDogsMod
                     WarpToOwnerFarmHouse(pet);
                 }
             }
-        }
-
-        private void OnUpdateTicked(object sender, UpdateTickedEventArgs e)
-        {
-
         }
 
         private void OnWarped(object sender, WarpedEventArgs e)
@@ -158,38 +137,8 @@ namespace CatsAndDogsMod
 
             // Main Player ------------------------------------------
             HandleTeleportingPetsHomeAtNight(player);
-
         }
 
-        public void HandleTeleportingPetsHomeAtNight(Farmer player)
-        {
-            if (didPetsWarpHome)
-                return;
-
-            if (!isPetOwner(player))
-                return;
-
-            bool isAPetOnBed = false;
-
-            foreach (Pet pet in GetAllPets())
-            {
-                WarpToOwnerFarmHouse(pet);
-                if (isAPetOnBed)
-                {
-                    pet.isSleepingOnFarmerBed.Value = false;
-                    WarpPetAgain(pet);
-
-                }
-                if (pet.isSleepingOnFarmerBed.Value)
-                    isAPetOnBed = true;
-            }
-
-            didPetsWarpHome = true;
-        }
-
-        /// <summary> Raised after a mod message is received over the network. </summary>
-        /// <param name="sender">The event sender.</param>
-        /// <param name="e">The event arguments.</param>
         private void OnModMessageReceived(object sender, ModMessageReceivedEventArgs e)
         {
             if (e.Type == PlayerWarpedHomeMessageId && Context.IsMainPlayer && e.FromModID == SModManifest.UniqueID)
@@ -197,28 +146,26 @@ namespace CatsAndDogsMod
                 PlayerWarpedMessage message = e.ReadAs<PlayerWarpedMessage>();
                 HandleTeleportingPetsHomeAtNight(Game1.getFarmer(message.playerId));
                 return;
-                
+
             }
         }
 
+        /*********
+        ** Internal methods
+        *********/
         /// <summary>
-        /// Adds the pet to the farm
-        /// adds a space to the pet name to avoid conflict with villager names
+        /// Dialog Box for Adopting a pet
         /// </summary>
-        /// <param name="petName">User-provided name for the pet</param>
-        private static void AddPet(string petName)
+        internal static void ShowAdoptPetDialog(string petType)
         {
-            if(newPet == null)
+            Game1.activeClickableMenu = new ConfirmationDialog($"Would you like to adopt a {petType}?", (who) =>
             {
-                SMonitor.Log($"Something went wrong adding the new pet \"{petName}\". No pet was added", LogLevel.Error);
-                Game1.drawObjectDialogue($"{petName} could not be adopted");
-                return;
-            }
-            newPet.Name = petName + " ";
-            newPet.displayName = petName + " ";
-            WarpToOwnerFarmHouse(newPet);
-            Game1.drawObjectDialogue($"{petName} has been adopted");
-            newPet = null;
+                if (Game1.activeClickableMenu is ConfirmationDialog cd)
+                    cd.cancel();
+
+                // Name Input Dialog
+                Game1.activeClickableMenu = new NamingMenu(AddPet, $"What will you name it?");
+            });
         }
 
         /// <summary>
@@ -230,7 +177,7 @@ namespace CatsAndDogsMod
             Pet petToRemove = null;
 
             GetAllPets().ForEach(delegate (Pet pet) {
-                if (pet.displayName.Replace(" ", string.Empty) == petName)
+                if (pet.displayName.TrimEnd() == petName)
                     petToRemove = pet;
             });
 
@@ -251,6 +198,144 @@ namespace CatsAndDogsMod
             GetAllPets().ForEach(delegate (Pet pet) {
                 SMonitor.Log($"- {pet.displayName}", LogLevel.Info);
             });
+        }
+
+        /// <summary>
+        /// Gets all pets currently on Farm or in FarmHouses
+        /// </summary>
+        /// <returns>List of Pet objects</returns>
+        internal static List<Pet> GetAllPets()
+        {
+            List<Pet> pets = new List<Pet>();
+            foreach (NPC j in Game1.getFarm().characters)
+            {
+                if (j is Pet)
+                {
+                    pets.Add(j as Pet);
+                }
+            }
+            foreach (Farmer farmer in Game1.getAllFarmers())
+            {
+                foreach (NPC i in Utility.getHomeOfFarmer(farmer).characters)
+                {
+                    if (i is Pet)
+                    {
+                        pets.Add(i as Pet);
+                    }
+                }
+            }
+            return pets;
+        }
+
+        /// <summary>
+        /// Initializes newPet to be a cat
+        /// </summary>
+        /// <param name="breed">breed id for selecting pet texture</param>
+        internal static void InitializeCat(int breed)
+        {
+            newPet = new Cat(0, 0, breed)
+            {
+                Name = $"cat{breed}",
+                displayName = $"cat{breed}",
+                Sprite = new AnimatedSprite(GetPetTextureName("cat", breed), 0, 32, 32),
+                Position = new Vector2(0, 0),
+                DefaultPosition = new Vector2(0, 0),
+                Breather = false,
+                willDestroyObjectsUnderfoot = false,
+                HideShadow = true,
+                loveInterest = Game1.player.displayName // to handle pet owner
+            };
+        }
+
+        /// <summary>
+        /// For assigning an owner to a pet. Owner is stored in loveInterest property of NPC
+        /// </summary>
+        /// <param name="petName">Name of pet to get new owner</param>
+        /// <param name="farmerName">Name of farmer to assign as new owner</param>
+        internal static void AssignPetOwner(string petName, string farmerName)
+        {
+            var petExists = false;
+            var farmerExists = false;
+
+            foreach (Farmer farmer in Game1.getAllFarmers())
+            {
+                if (farmer.displayName == farmerName)
+                {
+                    farmerExists = true;
+                    break;
+                }
+            }
+
+            if (farmerExists)
+            {
+                foreach (Pet pet in GetAllPets())
+                {
+                    if (pet.displayName.TrimEnd() == petName)
+                    {
+                        petExists = true;
+                        pet.loveInterest = farmerName;
+                        SMonitor.Log($"{petName}'s new owner is {farmerName}.", LogLevel.Info);
+                        break;
+                    }
+                }
+
+                if (!petExists)
+                {
+                    SMonitor.Log($"Could not find pet with name {petName}.", LogLevel.Error);
+                    return;
+                }
+            }
+            else
+            {
+                SMonitor.Log($"Could not find farmer with name {farmerName}.", LogLevel.Error);
+                return;
+            }
+
+        }
+
+        /// <summary>
+        /// Initializes newPet to be a dog
+        /// </summary>
+        /// <param name="breed">breed id for selecting pet texture</param>
+        internal static void InitializeDog(int breed)
+        {
+            newPet = new Dog(0, 0, breed)
+            {
+                Name = $"dog{breed}",
+                displayName = $"dog{breed}",
+                Sprite = new AnimatedSprite(GetPetTextureName("dog", breed), 0, 32, 32),
+                Position = new Vector2(0, 0),
+                DefaultPosition = new Vector2(0, 0),
+                Breather = false,
+                willDestroyObjectsUnderfoot = false,
+                HideShadow = true,
+                loveInterest = Game1.player.displayName // to handle pet owner
+            };
+        }
+
+
+        /*********
+        ** Private methods
+        *********/
+
+        /// <summary>
+        /// Adds the pet to the farm
+        /// adds a space to the pet name to avoid conflict with villager names
+        /// </summary>
+        /// <param name="petName">User-provided name for the pet</param>
+        private static void AddPet(string petName)
+        {
+            if(newPet == null)
+            {
+                SMonitor.Log($"Something went wrong adding the new pet \"{petName}\". No pet was added", LogLevel.Error);
+                Game1.drawObjectDialogue($"{petName} could not be adopted");
+                return;
+            }
+            newPet.Name = petName + " ";
+            newPet.displayName = petName + " ";
+            WarpToOwnerFarmHouse(newPet);
+            Game1.drawObjectDialogue($"{petName} has been adopted");
+            newPet = null;
         }
 
         /// <summary>
@@ -341,49 +426,33 @@ namespace CatsAndDogsMod
             return $"Animals\\{pet}" + ((breed == 0) ? "" : string.Concat(breed));
         }
 
-        /// <summary>
-        /// Dialog Box for Adopting a pet
-        /// </summary>
-        internal static void ShowAdoptPetDialog(string petType)
+        private void HandleTeleportingPetsHomeAtNight(Farmer player)
         {
-            Game1.activeClickableMenu = new ConfirmationDialog($"Would you like to adopt a {petType}?", (who) =>
-            {
-                if (Game1.activeClickableMenu is ConfirmationDialog cd)
-                    cd.cancel();
+            if (didPetsWarpHome)
+                return;
 
-                // Name Input Dialog
-                Game1.activeClickableMenu = new NamingMenu(AddPet, $"What will you name it?");
-            });
+            if (!isPetOwner(player))
+                return;
+
+            bool isAPetOnBed = false;
+
+            foreach (Pet pet in GetAllPets())
+            {
+                WarpToOwnerFarmHouse(pet);
+                if (isAPetOnBed)
+                {
+                    pet.isSleepingOnFarmerBed.Value = false;
+                    WarpPetAgain(pet);
+
+                }
+                if (pet.isSleepingOnFarmerBed.Value)
+                    isAPetOnBed = true;
+            }
+
+            didPetsWarpHome = true;
         }
 
-        /// <summary>
-        /// Gets all pets currently on Farm or in FarmHouses
-        /// </summary>
-        /// <returns>List of Pet objects</returns>
-        internal static List<Pet> GetAllPets()
-        {
-            List<Pet> pets = new List<Pet>();
-            foreach (NPC j in Game1.getFarm().characters)
-            {
-                if (j is Pet)
-                {
-                    pets.Add(j as Pet);
-                }
-            }
-            foreach (Farmer farmer in Game1.getAllFarmers())
-            {
-                foreach (NPC i in Utility.getHomeOfFarmer(farmer).characters)
-                {
-                    if (i is Pet)
-                    {
-                        pets.Add(i as Pet);
-                    }
-                }
-            }
-            return pets;
-        }
-
-        internal static List<string> GetAllPetOwnerNames()
+        private static List<string> GetAllPetOwnerNames()
         {
             List<string> ownerNames = new List<string>();
             foreach(Pet pet in GetAllPets())
@@ -402,95 +471,9 @@ namespace CatsAndDogsMod
         /// </summary>
         /// <param name="farmer">farmer object to check</param>
         /// <returns>true if farmer is a pet owner</returns>
-        internal static bool isPetOwner(Farmer farmer)
+        private static bool isPetOwner(Farmer farmer)
         {
             return GetAllPetOwnerNames().Contains(farmer.displayName);
-        }
-
-        /// <summary>
-        /// Initializes newPet to be a cat
-        /// </summary>
-        /// <param name="breed">breed id for selecting pet texture</param>
-        internal static void InitializeCat(int breed)
-        {
-            newPet = new Cat(0, 0, breed)
-            {
-                Name = $"cat{breed}",
-                displayName = $"cat{breed}",
-                Sprite = new AnimatedSprite(GetPetTextureName("cat", breed), 0, 32, 32),
-                Position = new Vector2(0, 0),
-                DefaultPosition = new Vector2(0, 0),
-                Breather = false,
-                willDestroyObjectsUnderfoot = false,
-                HideShadow = true,
-                loveInterest = player.displayName // to handle pet owner
-            };
-        }
-
-        /// <summary>
-        /// Initializes newPet to be a dog
-        /// </summary>
-        /// <param name="breed">breed id for selecting pet texture</param>
-        internal static void InitializeDog(int breed)
-        {
-            newPet = new Dog(0, 0, breed)
-            {
-                Name = $"dog{breed}",
-                displayName = $"dog{breed}",
-                Sprite = new AnimatedSprite(GetPetTextureName("dog", breed), 0, 32, 32),
-                Position = new Vector2(0, 0),
-                DefaultPosition = new Vector2(0, 0),
-                Breather = false,
-                willDestroyObjectsUnderfoot = false,
-                HideShadow = true,
-                loveInterest = player.displayName // to handle pet owner
-            };
-        }
-
-        /// <summary>
-        /// For assigning an owner to a pet. Owner is stored in loveInterest property of NPC
-        /// </summary>
-        /// <param name="petName">Name of pet to get new owner</param>
-        /// <param name="farmerName">Name of farmer to assign as new owner</param>
-        internal static void AssignPetOwner(string petName, string farmerName)
-        {
-            var petExists = false;
-            var farmerExists = false;
-
-            foreach (Farmer farmer in Game1.getAllFarmers())
-            {
-                if (farmer.displayName == farmerName)
-                {
-                    farmerExists = true;
-                    break;
-                }
-            }
-
-            if (farmerExists)
-            {
-                foreach (Pet pet in GetAllPets())
-                {
-                    if (pet.displayName.Replace(" ", string.Empty) == petName)
-                    {
-                        petExists = true;
-                        pet.loveInterest = farmerName;
-                        SMonitor.Log($"{petName}'s new owner is {farmerName}.", LogLevel.Info);
-                        break;
-                    }
-                }
-
-                if (!petExists)
-                {
-                    SMonitor.Log($"Could not find pet with name {petName}.", LogLevel.Error);
-                    return;
-                }
-            }
-            else
-            {
-                SMonitor.Log($"Could not find farmer with name {farmerName}.", LogLevel.Error);
-                return;
-            }
-            
         }
 
         /// <summary>
