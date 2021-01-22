@@ -1,13 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using StardewModdingAPI;
-using StardewValley;
-
-namespace CatsAndDogsMod.Framework
+﻿namespace CatsAndDogsMod.Framework
 {
     class PlayerWarpedMessage
     {

@@ -3,11 +3,8 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
-using StardewModdingAPI.Framework;
-using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Characters;
-using StardewValley.Buildings;
 using StardewValley.Locations;
 using StardewValley.Menus;
 using StardewValley.Objects;
@@ -68,9 +65,9 @@ namespace CatsAndDogsMod
         }
 
         
-        /*********
+        /*****************
         ** Event Handlers
-        *********/
+        ******************/
 
         private void OnSaveLoaded(object sender, SaveLoadedEventArgs e)
         {
@@ -150,9 +147,9 @@ namespace CatsAndDogsMod
             }
         }
 
-        /*********
-        ** Internal methods
-        *********/
+        /*******************************************
+        ** Internal methods - Handlers for Commands
+        ********************************************/
         /// <summary>
         /// Dialog Box for Adopting a pet
         /// </summary>
@@ -314,9 +311,9 @@ namespace CatsAndDogsMod
         }
 
 
-        /*********
+        /******************
         ** Private methods
-        *********/
+        *******************/
 
         /// <summary>
         /// Adds the pet to the farm
