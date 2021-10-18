@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using CatsAndDogsMod.Framework;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -8,7 +8,9 @@ using StardewValley.Characters;
 using StardewValley.Locations;
 using StardewValley.Menus;
 using StardewValley.Objects;
-using CatsAndDogsMod.Framework;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace CatsAndDogsMod
 {
@@ -23,11 +25,17 @@ namespace CatsAndDogsMod
         internal static IModHelper SHelper;
         internal static IManifest SModManifest;
 
-        
+        private readonly uint TextureUpdateRateWithSinglePlayer = 30;
+        private readonly uint TextureUpdateRateWithMultiplePlayers = 3;
+
+
         private static bool didPetsWarpHome = false;
 
         private static Pet newPet;
+
         private static Dictionary<string, Farmer> allFarmers = new Dictionary<string, Farmer>();
+        private static Dictionary<int, Texture2D> catTextureMap = new Dictionary<int, Texture2D>();
+        private static Dictionary<int, Texture2D> dogTextureMap = new Dictionary<int, Texture2D>();
 
 
         internal static bool IsEnabled = true;
@@ -54,7 +62,9 @@ namespace CatsAndDogsMod
             helper.Events.GameLoop.DayStarted += OnDayStarted;
             helper.Events.Player.Warped += OnWarped;
             helper.Events.Multiplayer.ModMessageReceived += OnModMessageReceived;
-            
+            helper.Events.Input.ButtonPressed += this.OnButtonPressed;
+            helper.Events.GameLoop.UpdateTicked += this.OnUpdateTicked;
+
             // SMAPI Commands
             helper.ConsoleCommands.Add("list_pets", "Lists the names of all pets on your farm.", CommandHandler.OnCommandReceived);
             helper.ConsoleCommands.Add("add_cat", "Adds a cat of given breed. Breed is a number between 0-2. This will give you an in-game naming prompt.", CommandHandler.OnCommandReceived);
@@ -106,12 +116,17 @@ namespace CatsAndDogsMod
                     WarpToOwnerFarmHouse(pet);
                 }
             }
+            LoadCatSprites();
+            LoadDogSprites();
+            SetPetSprites();
         }
 
         private void OnWarped(object sender, WarpedEventArgs e)
         {
             if (!IsEnabled)
                 return;
+
+           // SetPetSprites();
 
             if (didPetsWarpHome)
                 return;
@@ -136,6 +151,23 @@ namespace CatsAndDogsMod
             HandleTeleportingPetsHomeAtNight(player);
         }
 
+        private void OnUpdateTicked(object sender, UpdateTickedEventArgs e)
+        {
+            if (!IsEnabled)
+                return;
+
+            // multiplayer: override textures in the current location
+            if (Context.IsWorldReady && Game1.currentLocation != null)
+            {
+                uint updateRate = Game1.currentLocation.farmers.Count > 1 ? TextureUpdateRateWithMultiplePlayers : TextureUpdateRateWithSinglePlayer;
+                if (e.IsMultipleOf(updateRate))
+                {
+                    foreach (Pet pet in Game1.currentLocation.characters.OfType<Pet>())
+                        SetPetSprite(pet);
+                }
+            }
+        }
+
         private void OnModMessageReceived(object sender, ModMessageReceivedEventArgs e)
         {
             if (e.Type == PlayerWarpedHomeMessageId && Context.IsMainPlayer && e.FromModID == SModManifest.UniqueID)
@@ -146,6 +178,53 @@ namespace CatsAndDogsMod
 
             }
         }
+
+        private void OnButtonPressed(object sender, ButtonPressedEventArgs e)
+        {
+            if (!Context.IsWorldReady)
+                return;
+
+            if (!IsEnabled)
+                return;
+
+            if (!Game1.player.currentLocation.IsFarm)
+                return;
+
+            bool IsPlayerNearWaterBowl()
+            {
+                var petBowlPosition = (Game1.getLocationFromName("Farm") as Farm).petBowlPosition;
+                var bowlRect = new Rectangle(petBowlPosition.X - 1, petBowlPosition.Y - 1, 3, 3);
+                if (bowlRect.Contains(new Point(Game1.player.getTileX(), Game1.player.getTileY()))) // player standing near bowl
+                    return true;
+                return false;
+            }
+
+
+            // Right click near water bowl
+            if (e.Button.IsActionButton() && IsPlayerNearWaterBowl())
+            {
+                if (!Context.IsMainPlayer)
+                {
+                    SMonitor.Log("Only the host can manage pets - and pet management is not supported during split-screen multiplayer", LogLevel.Warn);
+                    return;
+                }
+
+                // Player holding Fiber (catnip) to adopt Cat
+                if (Game1.player.CurrentItem.Name.Contains("Fiber"))
+                {
+                    InitializeCat(0);
+                    ShowAdoptPetDialog("cat");
+                }
+                else if (Game1.player.CurrentItem.Name.Contains("Wood"))
+                {
+                    InitializeDog(0);
+                    ShowAdoptPetDialog("dog");
+                }
+
+
+            }
+        }
+
 
         /*******************************************
         ** Internal methods - Handlers for Commands
@@ -160,8 +239,11 @@ namespace CatsAndDogsMod
                 if (Game1.activeClickableMenu is ConfirmationDialog cd)
                     cd.cancel();
 
-                // Name Input Dialog
-                Game1.activeClickableMenu = new NamingMenu(AddPet, $"What will you name it?");
+                if (Game1.activeClickableMenu == null)
+                {
+                    Game1.activeClickableMenu = new PetSkinSelectMenu(petType, petType == "cat" ? catTextureMap : dogTextureMap);
+                }
+
             });
         }
 
@@ -240,7 +322,28 @@ namespace CatsAndDogsMod
                 Breather = false,
                 willDestroyObjectsUnderfoot = false,
                 HideShadow = true,
-                loveInterest = Game1.player.displayName // to handle pet owner
+                loveInterest = Game1.player.displayName, // to handle pet owner
+                lastAttemptedSchedule = 0 // to handle skin
+            };
+        }
+        /// <summary>
+        /// Initializes newPet to be a dog
+        /// </summary>
+        /// <param name="breed">breed id for selecting pet texture</param>
+        internal static void InitializeDog(int breed)
+        {
+            newPet = new Dog(0, 0, breed)
+            {
+                Name = $"dog{breed}",
+                displayName = $"dog{breed}",
+                Sprite = new AnimatedSprite(GetPetTextureName("dog", breed), 0, 32, 32),
+                Position = new Vector2(0, 0),
+                DefaultPosition = new Vector2(0, 0),
+                Breather = false,
+                willDestroyObjectsUnderfoot = false,
+                HideShadow = true,
+                loveInterest = Game1.player.displayName, // to handle pet owner
+                lastAttemptedSchedule = 0 // to handle skin
             };
         }
 
@@ -290,25 +393,7 @@ namespace CatsAndDogsMod
 
         }
 
-        /// <summary>
-        /// Initializes newPet to be a dog
-        /// </summary>
-        /// <param name="breed">breed id for selecting pet texture</param>
-        internal static void InitializeDog(int breed)
-        {
-            newPet = new Dog(0, 0, breed)
-            {
-                Name = $"dog{breed}",
-                displayName = $"dog{breed}",
-                Sprite = new AnimatedSprite(GetPetTextureName("dog", breed), 0, 32, 32),
-                Position = new Vector2(0, 0),
-                DefaultPosition = new Vector2(0, 0),
-                Breather = false,
-                willDestroyObjectsUnderfoot = false,
-                HideShadow = true,
-                loveInterest = Game1.player.displayName // to handle pet owner
-            };
-        }
+
 
 
         /******************
@@ -320,7 +405,7 @@ namespace CatsAndDogsMod
         /// adds a space to the pet name to avoid conflict with villager names
         /// </summary>
         /// <param name="petName">User-provided name for the pet</param>
-        private static void AddPet(string petName)
+        public static void AddPet(string petName)
         {
             if(newPet == null)
             {
@@ -331,8 +416,38 @@ namespace CatsAndDogsMod
             newPet.Name = petName + " ";
             newPet.displayName = petName + " ";
             WarpToOwnerFarmHouse(newPet);
-            Game1.drawObjectDialogue($"{petName} has been adopted");
+            Game1.drawObjectDialogue($"{petName} has been adopted and is staying inside today");
+            SetPetSprite(newPet);
             newPet = null;
+        }
+
+        public static void SetPetSkin(int skinId)
+        {
+            newPet.lastAttemptedSchedule = skinId;
+            SMonitor.Log($"Pet Skin set to: {skinId}", LogLevel.Info);
+        }
+
+        private void SetPetSprites()
+        {
+            foreach (Pet pet in GetAllPets())
+            {
+                SetPetSprite(pet);
+            }
+        }
+
+        private static void SetPetSprite(Pet pet)
+        {
+            if (pet.lastAttemptedSchedule < 1)
+                return;
+
+            if (pet is Cat)
+            {
+                pet.Sprite.spriteTexture = catTextureMap[pet.lastAttemptedSchedule];
+            }
+            else if (pet is Dog)
+            {
+                pet.Sprite.spriteTexture = dogTextureMap[pet.lastAttemptedSchedule];
+            }
         }
 
         /// <summary>
@@ -363,6 +478,37 @@ namespace CatsAndDogsMod
             SMonitor.Log($"{petToRemove.displayName} has been removed", LogLevel.Info);
         }
 
+        private  void LoadCatSprites()
+        {
+            string modPath = SHelper.DirectoryPath + "\\";
+
+            var files = Directory.GetFiles($"{modPath}assets\\cats");
+            for(var i = 0; i < files.Length; i++)
+            {
+                var relFileName = AbsoluteToRelativePath(files[i], modPath);
+                catTextureMap[i+1] = SHelper.Content.Load<Texture2D>(relFileName);
+                // SMonitor.Log($"{relFileName}", LogLevel.Info);
+            }
+        }
+
+        private void LoadDogSprites()
+        {
+            string modPath = SHelper.DirectoryPath + "\\";
+
+            var files = Directory.GetFiles($"{modPath}assets\\dogs");
+            for (var i = 0; i < files.Length; i++)
+            {
+                var relFileName = AbsoluteToRelativePath(files[i], modPath);
+                dogTextureMap[i+1] = SHelper.Content.Load<Texture2D>(relFileName);
+                // SMonitor.Log($"{relFileName}", LogLevel.Info);
+            }
+        }
+
+        private string AbsoluteToRelativePath(string absolutePath, string modPath)
+        {
+            return absolutePath.Replace(modPath, "");
+        }
+
         /// <summary>
         /// Gets all FarmHouses owned by current players. This is needed to find pets that are indoors
         /// </summary>
@@ -388,10 +534,12 @@ namespace CatsAndDogsMod
             {
                 if (farmer != null && farmer.displayName != null && farmer.displayName != "")
                 {
-                    allFarmers.Add(farmer.displayName, farmer);
+                    if(!allFarmers.ContainsKey(farmer.displayName))
+                        allFarmers.Add(farmer.displayName, farmer);
                 }
             }
         }
+
 
         /// <summary>
         /// Warps pet to the owner's farmhouse/cabin if owner is known. Otherwise, warps to host farmhouse
@@ -411,6 +559,7 @@ namespace CatsAndDogsMod
                 pet.warpToFarmHouse(Game1.MasterPlayer);
             }
         }
+
 
         /// <summary>
         /// Helper function for getting a sprite's texture name

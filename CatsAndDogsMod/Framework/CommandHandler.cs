@@ -41,9 +41,9 @@ namespace CatsAndDogsMod.Framework
             {
                 case "list_pets":
                     ModEntry.GetAllPets().ForEach(delegate (Pet pet) {
-                        if (pet.GetType() == typeof(Cat)) petType = "cat";
-                        if (pet.GetType() == typeof(Dog)) petType = "dog";
-                        ModEntry.SMonitor.Log($"{pet.displayName}, {petType}, owner: {pet.loveInterest}", LogLevel.Info);
+                        if (pet is Cat) petType = "cat";
+                        if (pet is Dog) petType = "dog";
+                        ModEntry.SMonitor.Log($"{pet.displayName}, {petType}, owner: {pet.loveInterest}, skinId: {pet.lastAttemptedSchedule}", LogLevel.Info);
                     });
                     return;
                 case "add_cat":
