@@ -1,14 +1,9 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CatsAndDogsMod.Framework
 {
@@ -16,8 +11,7 @@ namespace CatsAndDogsMod.Framework
     {
         // Handling Skin
         public int currentSkinId = 1;
-        public Dictionary<int, Texture2D> skinTextureMap;
-        public string petType;
+        public Dictionary<string, Texture2D> skinTextureMap;
 
         // Menu Textures
         public ClickableTextureComponent petPreview;
@@ -41,21 +35,12 @@ namespace CatsAndDogsMod.Framework
         private readonly int forwardButtonId = 33;
         private readonly int okButtonId = 46;
 
-        public PetSkinSelectMenu(string petType, Dictionary<int, Texture2D> skinTextureMap)
+        public PetSkinSelectMenu(Dictionary<string, Texture2D> skinTextureMap)
         {
-            this.petType = petType;
-            this.skinTextureMap = new Dictionary<int, Texture2D>(skinTextureMap);
-
-            if (this.skinTextureMap.Count < 1)
-            {
-                // TODO: consider using the 3 default textures/breeds when none are found 
-                ModEntry.SMonitor.Log("The pet adoption menu is not available because no textures were found", LogLevel.Error);
-                base.exitThisMenu();
-                return;
-            }
+            this.skinTextureMap = new Dictionary<string, Texture2D>(skinTextureMap);
             resetBounds();
         }
-        public Texture2D CurrentPetTexture => this.skinTextureMap[this.currentSkinId];
+        public Texture2D CurrentPetTexture => this.skinTextureMap[this.currentSkinId.ToString()];
 
         public override void receiveGamePadButton(Buttons b)
         {
@@ -81,6 +66,12 @@ namespace CatsAndDogsMod.Framework
                 Game1.playSound("shwip");
                 updatePetPreview();
             }
+            //if (b == Buttons.A)
+            //{
+            //    selectSkin();
+            //    base.exitThisMenu();
+            //    Game1.playSound("smallSelect");
+            //}
         }
         public override void receiveLeftClick(int x, int y, bool playSound = true)
         {

@@ -15,8 +15,12 @@ using System.Linq;
 namespace CatsAndDogsMod
 {
     // TODO:
-    // - Use better spawning location
+    // - Test multiplayer
+    // - Add In-game menu for removing pets
+    // - Handle online multiplayer (using mod message to let farmhand add pets)
+    // - Use better spawning location (temporarily fixed with supporting mod)
     // - Pet portrait update
+
 
     /// <summary>The mod entry point.</summary>
     public class ModEntry : Mod
@@ -25,27 +29,28 @@ namespace CatsAndDogsMod
         internal static IModHelper SHelper;
         internal static IManifest SModManifest;
 
-        private readonly uint TextureUpdateRateWithSinglePlayer = 30;
-        private readonly uint TextureUpdateRateWithMultiplePlayers = 3;
-
 
         private static bool didPetsWarpHome = false;
 
         private static Pet newPet;
 
         private static Dictionary<string, Farmer> allFarmers = new Dictionary<string, Farmer>();
-        private static Dictionary<int, Texture2D> catTextureMap = new Dictionary<int, Texture2D>();
-        private static Dictionary<int, Texture2D> dogTextureMap = new Dictionary<int, Texture2D>();
+        private static Dictionary<string, Texture2D> catTextureMap = new Dictionary<string, Texture2D>();
+        private static Dictionary<string, Texture2D> dogTextureMap = new Dictionary<string, Texture2D>();
 
 
         internal static bool IsEnabled = true;
 
-        
+
         // Constants
+        private readonly uint TextureUpdateRateWithSinglePlayer = 30;
+        private readonly uint TextureUpdateRateWithMultiplePlayers = 3;
         internal static readonly string PlayerWarpedHomeMessageId = "PlayerHome";
+        public static string MOD_DATA_SKIN_ID;
+        public static string MOD_DATA_OWNER;
 
         // The minimum version the host must have for the mod to be enabled on a farmhand.
-        private readonly string MinHostVersion = "1.1.0";
+        private readonly string MinHostVersion = "2.0.0";
 
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
@@ -56,6 +61,9 @@ namespace CatsAndDogsMod
             SMonitor = Monitor;
             SHelper = helper;
             SModManifest = ModManifest;
+
+            MOD_DATA_OWNER = $"{SModManifest.UniqueID}/owner";
+            MOD_DATA_SKIN_ID = $"{SModManifest.UniqueID}/skinId";
 
             // Event handlers
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
@@ -100,13 +108,31 @@ namespace CatsAndDogsMod
                 else
                     IsEnabled = true;
             }
+
+            LoadCatSprites();
+            LoadDogSprites();
+            SetPetSprites();
+
+            if (Context.IsMainPlayer)
+            {
+                // to handle version change
+                foreach(Pet pet in GetAllPets())
+                {
+                    if (!pet.modData.ContainsKey(MOD_DATA_OWNER))
+                    {
+                        pet.modData[MOD_DATA_OWNER] = pet.loveInterest;
+                    }
+                }
+            }
         }
 
         private void OnDayStarted(object sender, DayStartedEventArgs e)
         {
+
             if (!Context.IsMainPlayer)
                 return;
-            GenerateAllFarmersDict();
+
+            GenerateAllFarmersDict(); // TODO: do we need this for multiplayer? => add to onStart & to on farmhand connect?
             didPetsWarpHome = false;
             if (Game1.isRaining)
             {
@@ -116,17 +142,12 @@ namespace CatsAndDogsMod
                     WarpToOwnerFarmHouse(pet);
                 }
             }
-            LoadCatSprites();
-            LoadDogSprites();
-            SetPetSprites();
         }
 
         private void OnWarped(object sender, WarpedEventArgs e)
         {
             if (!IsEnabled)
                 return;
-
-           // SetPetSprites();
 
             if (didPetsWarpHome)
                 return;
@@ -177,6 +198,8 @@ namespace CatsAndDogsMod
                 return;
 
             }
+
+            // TODO: to allow farmhands to create pets: handle a create pet message
         }
 
         private void OnButtonPressed(object sender, ButtonPressedEventArgs e)
@@ -188,6 +211,9 @@ namespace CatsAndDogsMod
                 return;
 
             if (!Game1.player.currentLocation.IsFarm)
+                return;
+
+            if (Game1.activeClickableMenu != null)
                 return;
 
             bool IsPlayerNearWaterBowl()
@@ -241,14 +267,27 @@ namespace CatsAndDogsMod
 
                 if (Game1.activeClickableMenu == null)
                 {
-                    Game1.activeClickableMenu = new PetSkinSelectMenu(petType, petType == "cat" ? catTextureMap : dogTextureMap);
+                    if (petType == "cat" && catTextureMap.Count < 1)
+                    {
+                        SMonitor.Log("The pet adoption texture selection menu is not available because no textures were found", LogLevel.Warn);
+                        Game1.activeClickableMenu = new NamingMenu(AddPet, $"What will you name it?");
+                        return;
+                    }
+                    else if (petType == "dog" && dogTextureMap.Count < 1)
+                    {
+                        SMonitor.Log("The pet adoption texture selection menu is not available because no textures were found", LogLevel.Warn);
+                        Game1.activeClickableMenu = new NamingMenu(AddPet, $"What will you name it?");
+                        return;
+                    }
+
+                    Game1.activeClickableMenu = new PetSkinSelectMenu(petType == "cat" ? catTextureMap : dogTextureMap);
                 }
 
             });
         }
 
         /// <summary>
-        /// Handles dialog box for removing pet
+        /// Handles removing pet
         /// </summary>
         /// <param name="petName">Name of pet to be removed</param>
         internal static void RemovePet(string petName)
@@ -322,9 +361,8 @@ namespace CatsAndDogsMod
                 Breather = false,
                 willDestroyObjectsUnderfoot = false,
                 HideShadow = true,
-                loveInterest = Game1.player.displayName, // to handle pet owner
-                lastAttemptedSchedule = 0 // to handle skin
             };
+            newPet.modData[MOD_DATA_OWNER] = Game1.player.displayName;
         }
         /// <summary>
         /// Initializes newPet to be a dog
@@ -342,13 +380,12 @@ namespace CatsAndDogsMod
                 Breather = false,
                 willDestroyObjectsUnderfoot = false,
                 HideShadow = true,
-                loveInterest = Game1.player.displayName, // to handle pet owner
-                lastAttemptedSchedule = 0 // to handle skin
             };
+            newPet.modData[MOD_DATA_OWNER] = Game1.player.displayName;
         }
 
         /// <summary>
-        /// For assigning an owner to a pet. Owner is stored in loveInterest property of NPC
+        /// For assigning an owner to a pet.
         /// </summary>
         /// <param name="petName">Name of pet to get new owner</param>
         /// <param name="farmerName">Name of farmer to assign as new owner</param>
@@ -373,7 +410,7 @@ namespace CatsAndDogsMod
                     if (pet.displayName.TrimEnd() == petName)
                     {
                         petExists = true;
-                        pet.loveInterest = farmerName;
+                        pet.modData[MOD_DATA_OWNER] = farmerName;
                         SMonitor.Log($"{petName}'s new owner is {farmerName}.", LogLevel.Info);
                         break;
                     }
@@ -423,8 +460,8 @@ namespace CatsAndDogsMod
 
         public static void SetPetSkin(int skinId)
         {
-            newPet.lastAttemptedSchedule = skinId;
-            SMonitor.Log($"Pet Skin set to: {skinId}", LogLevel.Info);
+            newPet.modData[MOD_DATA_SKIN_ID] = skinId.ToString();
+            // SMonitor.Log($"Pet Skin set to: {skinId}", LogLevel.Info);
         }
 
         private void SetPetSprites()
@@ -437,16 +474,16 @@ namespace CatsAndDogsMod
 
         private static void SetPetSprite(Pet pet)
         {
-            if (pet.lastAttemptedSchedule < 1)
+            if (!pet.modData.ContainsKey(MOD_DATA_SKIN_ID))
                 return;
 
-            if (pet is Cat)
+            if (pet is Cat && catTextureMap.Count > 0 && catTextureMap.ContainsKey(pet.modData[MOD_DATA_SKIN_ID]))
             {
-                pet.Sprite.spriteTexture = catTextureMap[pet.lastAttemptedSchedule];
+                pet.Sprite.spriteTexture = catTextureMap[pet.modData[MOD_DATA_SKIN_ID]];
             }
-            else if (pet is Dog)
+            else if (pet is Dog && dogTextureMap.Count > 0 && dogTextureMap.ContainsKey(pet.modData[MOD_DATA_SKIN_ID]))
             {
-                pet.Sprite.spriteTexture = dogTextureMap[pet.lastAttemptedSchedule];
+                pet.Sprite.spriteTexture = dogTextureMap[pet.modData[MOD_DATA_SKIN_ID]];
             }
         }
 
@@ -481,26 +518,37 @@ namespace CatsAndDogsMod
         private  void LoadCatSprites()
         {
             string modPath = SHelper.DirectoryPath + "\\";
+            string catPath = $"{modPath}assets\\cats";
 
-            var files = Directory.GetFiles($"{modPath}assets\\cats");
+            if (!Directory.Exists(catPath))
+            {
+                SMonitor.Log($"Cat asssets path could not be found. {catPath}", LogLevel.Warn);
+                return;
+            }
+            var files = Directory.GetFiles(catPath);
             for(var i = 0; i < files.Length; i++)
             {
                 var relFileName = AbsoluteToRelativePath(files[i], modPath);
-                catTextureMap[i+1] = SHelper.Content.Load<Texture2D>(relFileName);
-                // SMonitor.Log($"{relFileName}", LogLevel.Info);
+                catTextureMap[(i+1).ToString()] = SHelper.Content.Load<Texture2D>(relFileName); // TODO: refactor to use filename for key
             }
         }
 
         private void LoadDogSprites()
         {
             string modPath = SHelper.DirectoryPath + "\\";
+            string dogPath = $"{modPath}assets\\dogs";
 
-            var files = Directory.GetFiles($"{modPath}assets\\dogs");
+            if (!Directory.Exists(dogPath))
+            {
+                SMonitor.Log($"Dog asssets path could not be found. {dogPath}", LogLevel.Warn);
+                return;
+            }
+
+            var files = Directory.GetFiles(dogPath);
             for (var i = 0; i < files.Length; i++)
             {
                 var relFileName = AbsoluteToRelativePath(files[i], modPath);
-                dogTextureMap[i+1] = SHelper.Content.Load<Texture2D>(relFileName);
-                // SMonitor.Log($"{relFileName}", LogLevel.Info);
+                dogTextureMap[(i+1).ToString()] = SHelper.Content.Load<Texture2D>(relFileName); // TODO: refactor to use filename for key
             }
         }
 
@@ -547,10 +595,10 @@ namespace CatsAndDogsMod
         /// <param name="pet">Instance of pet to warp</param>
         private static void WarpToOwnerFarmHouse(Pet pet)
         {
-            if (pet.loveInterest != null)
+            if (pet.modData.ContainsKey(MOD_DATA_OWNER) && pet.modData[MOD_DATA_OWNER] != null)
             {
-                if(allFarmers.ContainsKey(pet.loveInterest))
-                    pet.warpToFarmHouse(allFarmers[pet.loveInterest]);
+                if(allFarmers.ContainsKey(pet.modData[MOD_DATA_OWNER]))
+                    pet.warpToFarmHouse(allFarmers[pet.modData[MOD_DATA_OWNER]]);
                 else
                     pet.warpToFarmHouse(Game1.MasterPlayer);
             }
@@ -603,9 +651,9 @@ namespace CatsAndDogsMod
             List<string> ownerNames = new List<string>();
             foreach(Pet pet in GetAllPets())
             {
-                if (pet.loveInterest != null && !ownerNames.Contains(pet.loveInterest))
+                if (pet.modData.ContainsKey(MOD_DATA_OWNER) && pet.modData[MOD_DATA_OWNER] != null && !ownerNames.Contains(pet.modData[MOD_DATA_OWNER]))
                 {
-                    ownerNames.Add(pet.loveInterest);
+                    ownerNames.Add(pet.modData[MOD_DATA_OWNER]);
                 }
             }
 
@@ -630,9 +678,9 @@ namespace CatsAndDogsMod
         private void WarpPetAgain(Pet pet)
         {
             Farmer owner = Game1.MasterPlayer;
-            if (pet.loveInterest != null)
-                if (allFarmers.ContainsKey(pet.loveInterest))
-                    owner = allFarmers[pet.loveInterest];
+            if (pet.modData[MOD_DATA_OWNER] != null)
+                if (allFarmers.ContainsKey(pet.modData[MOD_DATA_OWNER]))
+                    owner = allFarmers[pet.modData[MOD_DATA_OWNER]];
 
             pet.isSleepingOnFarmerBed.Value = false;
             FarmHouse farmHouse = Utility.getHomeOfFarmer(owner);
