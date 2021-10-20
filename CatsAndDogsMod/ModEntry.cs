@@ -16,8 +16,8 @@ namespace CatsAndDogsMod
 {
     // TODO:
     // - Test multiplayer
+    //   >>> handle skin id out of bounds
     // - Add In-game menu for removing pets
-    // - Handle online multiplayer (using mod message to let farmhand add pets)
     // - Use better spawning location (temporarily fixed with supporting mod)
     // - Pet portrait update
 
@@ -46,6 +46,7 @@ namespace CatsAndDogsMod
         private readonly uint TextureUpdateRateWithSinglePlayer = 30;
         private readonly uint TextureUpdateRateWithMultiplePlayers = 3;
         internal static readonly string PlayerWarpedHomeMessageId = "PlayerHome";
+        internal static readonly string PlayerAddedPetMessageId = "PlayerAddedPet";
         public static string MOD_DATA_SKIN_ID;
         public static string MOD_DATA_OWNER;
 
@@ -70,8 +71,9 @@ namespace CatsAndDogsMod
             helper.Events.GameLoop.DayStarted += OnDayStarted;
             helper.Events.Player.Warped += OnWarped;
             helper.Events.Multiplayer.ModMessageReceived += OnModMessageReceived;
-            helper.Events.Input.ButtonPressed += this.OnButtonPressed;
-            helper.Events.GameLoop.UpdateTicked += this.OnUpdateTicked;
+            helper.Events.Input.ButtonPressed += OnButtonPressed;
+            helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+            helper.Events.Multiplayer.PeerConnected += OnPeerConnected;
 
             // SMAPI Commands
             helper.ConsoleCommands.Add("list_pets", "Lists the names of all pets on your farm.", CommandHandler.OnCommandReceived);
@@ -112,6 +114,7 @@ namespace CatsAndDogsMod
             LoadCatSprites();
             LoadDogSprites();
             SetPetSprites();
+            GenerateAllFarmersDict();
 
             if (Context.IsMainPlayer)
             {
@@ -128,11 +131,9 @@ namespace CatsAndDogsMod
 
         private void OnDayStarted(object sender, DayStartedEventArgs e)
         {
-
             if (!Context.IsMainPlayer)
                 return;
-
-            GenerateAllFarmersDict(); // TODO: do we need this for multiplayer? => add to onStart & to on farmhand connect?
+             
             didPetsWarpHome = false;
             if (Game1.isRaining)
             {
@@ -191,6 +192,7 @@ namespace CatsAndDogsMod
 
         private void OnModMessageReceived(object sender, ModMessageReceivedEventArgs e)
         {
+            // Handles farmhands warping home
             if (e.Type == PlayerWarpedHomeMessageId && Context.IsMainPlayer && e.FromModID == SModManifest.UniqueID)
             {
                 PlayerWarpedMessage message = e.ReadAs<PlayerWarpedMessage>();
@@ -199,7 +201,27 @@ namespace CatsAndDogsMod
 
             }
 
-            // TODO: to allow farmhands to create pets: handle a create pet message
+            // Handles farmhands creating new pets
+            if (e.Type == PlayerAddedPetMessageId && Context.IsMainPlayer && e.FromModID == SModManifest.UniqueID)
+            {
+                PlayerAddedPetMessage message = e.ReadAs<PlayerAddedPetMessage>();
+
+                if (message.petType == "cat")
+                    InitializeCat(0);
+                else
+                    InitializeDog(0);
+
+                newPet.Name = message.petName;
+                newPet.displayName = message.petDisplayName;
+                newPet.modData[MOD_DATA_OWNER] = message.petOwner;
+                newPet.modData[MOD_DATA_SKIN_ID] = message.petSkinId;
+                WarpToOwnerFarmHouse(newPet);
+                SetPetSprite(newPet);
+
+                newPet = null;
+                return;
+
+            }
         }
 
         private void OnButtonPressed(object sender, ButtonPressedEventArgs e)
@@ -229,26 +251,29 @@ namespace CatsAndDogsMod
             // Right click near water bowl
             if (e.Button.IsActionButton() && IsPlayerNearWaterBowl())
             {
-                if (!Context.IsMainPlayer)
-                {
-                    SMonitor.Log("Only the host can manage pets - and pet management is not supported during split-screen multiplayer", LogLevel.Warn);
-                    return;
-                }
+                // TODO: add check for splitscreen multiplayer here?
 
                 // Player holding Fiber (catnip) to adopt Cat
                 if (Game1.player.CurrentItem.Name.Contains("Fiber"))
                 {
+                    // Helper.Input.Suppress(e.Button);
                     InitializeCat(0);
                     ShowAdoptPetDialog("cat");
                 }
                 else if (Game1.player.CurrentItem.Name.Contains("Wood"))
                 {
+                    // Helper.Input.Suppress(e.Button);
                     InitializeDog(0);
                     ShowAdoptPetDialog("dog");
                 }
 
 
             }
+        }
+
+        private void OnPeerConnected(object sender, PeerConnectedEventArgs e)
+        {
+            GenerateAllFarmersDict();
         }
 
 
@@ -355,7 +380,6 @@ namespace CatsAndDogsMod
             {
                 Name = $"cat{breed}",
                 displayName = $"cat{breed}",
-                Sprite = new AnimatedSprite(GetPetTextureName("cat", breed), 0, 32, 32),
                 Position = new Vector2(0, 0),
                 DefaultPosition = new Vector2(0, 0),
                 Breather = false,
@@ -374,7 +398,6 @@ namespace CatsAndDogsMod
             {
                 Name = $"dog{breed}",
                 displayName = $"dog{breed}",
-                Sprite = new AnimatedSprite(GetPetTextureName("dog", breed), 0, 32, 32),
                 Position = new Vector2(0, 0),
                 DefaultPosition = new Vector2(0, 0),
                 Breather = false,
@@ -444,7 +467,7 @@ namespace CatsAndDogsMod
         /// <param name="petName">User-provided name for the pet</param>
         public static void AddPet(string petName)
         {
-            if(newPet == null)
+            if (newPet == null)
             {
                 SMonitor.Log($"Something went wrong adding the new pet \"{petName}\". No pet was added", LogLevel.Error);
                 Game1.drawObjectDialogue($"{petName} could not be adopted");
@@ -452,16 +475,31 @@ namespace CatsAndDogsMod
             }
             newPet.Name = petName + " ";
             newPet.displayName = petName + " ";
-            WarpToOwnerFarmHouse(newPet);
+
+            if (!Context.IsMainPlayer)
+            {
+                // Send message to main player
+                SHelper.Multiplayer.SendMessage(
+                    message: new PlayerAddedPetMessage(newPet.Name, newPet.displayName, newPet.modData[MOD_DATA_OWNER], newPet.modData[MOD_DATA_SKIN_ID], newPet is Cat ? "cat" : "dog"),
+                    messageType: PlayerAddedPetMessageId,
+                    modIDs: new[] { SModManifest.UniqueID }
+                    );
+                Game1.drawObjectDialogue($"{petName} has been adopted and is staying inside today");
+                newPet = null;
+                return;
+            }
+            else
+            {
+                WarpToOwnerFarmHouse(newPet);
+                SetPetSprite(newPet);
+            }
             Game1.drawObjectDialogue($"{petName} has been adopted and is staying inside today");
-            SetPetSprite(newPet);
             newPet = null;
         }
 
         public static void SetPetSkin(int skinId)
         {
             newPet.modData[MOD_DATA_SKIN_ID] = skinId.ToString();
-            // SMonitor.Log($"Pet Skin set to: {skinId}", LogLevel.Info);
         }
 
         private void SetPetSprites()
