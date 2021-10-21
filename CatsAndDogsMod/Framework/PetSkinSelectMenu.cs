@@ -66,12 +66,12 @@ namespace CatsAndDogsMod.Framework
                 Game1.playSound("shwip");
                 updatePetPreview();
             }
-            //if (b == Buttons.A)
-            //{
-            //    selectSkin();
-            //    base.exitThisMenu();
-            //    Game1.playSound("smallSelect");
-            //}
+            if (b == Buttons.A)
+            {
+                selectSkin();
+                base.exitThisMenu();
+                Game1.playSound("smallSelect");
+            }
         }
         public override void receiveLeftClick(int x, int y, bool playSound = true)
         {

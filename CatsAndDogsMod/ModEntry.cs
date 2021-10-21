@@ -256,13 +256,13 @@ namespace CatsAndDogsMod
                 // Player holding Fiber (catnip) to adopt Cat
                 if (Game1.player.CurrentItem.Name.Contains("Fiber"))
                 {
-                    // Helper.Input.Suppress(e.Button);
+                    Helper.Input.Suppress(e.Button);
                     InitializeCat(0);
                     ShowAdoptPetDialog("cat");
                 }
                 else if (Game1.player.CurrentItem.Name.Contains("Wood"))
                 {
-                    // Helper.Input.Suppress(e.Button);
+                    Helper.Input.Suppress(e.Button);
                     InitializeDog(0);
                     ShowAdoptPetDialog("dog");
                 }
