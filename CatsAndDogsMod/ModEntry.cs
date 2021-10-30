@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Characters;
 using StardewValley.Locations;
@@ -556,7 +557,7 @@ namespace CatsAndDogsMod
         private  void LoadCatSprites()
         {
             string modPath = SHelper.DirectoryPath + "\\";
-            string catPath = $"{modPath}assets\\cats";
+            string catPath = PathUtilities.NormalizePath($"{modPath}assets\\cats");
 
             if (!Directory.Exists(catPath))
             {
@@ -574,7 +575,7 @@ namespace CatsAndDogsMod
         private void LoadDogSprites()
         {
             string modPath = SHelper.DirectoryPath + "\\";
-            string dogPath = $"{modPath}assets\\dogs";
+            string dogPath = PathUtilities.NormalizePath($"{modPath}assets\\dogs");
 
             if (!Directory.Exists(dogPath))
             {
