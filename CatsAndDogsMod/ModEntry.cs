@@ -556,7 +556,7 @@ namespace CatsAndDogsMod
 
         private  void LoadCatSprites()
         {
-            string modPath = SHelper.DirectoryPath + "\\";
+            string modPath = PathUtilities.NormalizePath(SHelper.DirectoryPath + "\\");
             string catPath = PathUtilities.NormalizePath($"{modPath}assets\\cats");
 
             if (!Directory.Exists(catPath))
@@ -574,7 +574,7 @@ namespace CatsAndDogsMod
 
         private void LoadDogSprites()
         {
-            string modPath = SHelper.DirectoryPath + "\\";
+            string modPath = PathUtilities.NormalizePath(SHelper.DirectoryPath + "\\");
             string dogPath = PathUtilities.NormalizePath($"{modPath}assets\\dogs");
 
             if (!Directory.Exists(dogPath))
