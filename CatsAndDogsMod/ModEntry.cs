@@ -564,7 +564,7 @@ namespace CatsAndDogsMod
                 SMonitor.Log($"Cat asssets path could not be found. {catPath}", LogLevel.Warn);
                 return;
             }
-            var files = Directory.GetFiles(catPath);
+            var files = Directory.GetFiles(catPath, "*.png");
             for(var i = 0; i < files.Length; i++)
             {
                 var relFileName = AbsoluteToRelativePath(files[i], modPath);
@@ -583,7 +583,7 @@ namespace CatsAndDogsMod
                 return;
             }
 
-            var files = Directory.GetFiles(dogPath);
+            var files = Directory.GetFiles(dogPath, "*.png");
             for (var i = 0; i < files.Length; i++)
             {
                 var relFileName = AbsoluteToRelativePath(files[i], modPath);
