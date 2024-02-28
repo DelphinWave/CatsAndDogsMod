@@ -124,7 +124,7 @@ namespace CatsAndDogsMod.Framework
                     return;
                 case "list_farmers":
                     foreach(Farmer farmer in Game1.getAllFarmers())
-                        ModEntry.SMonitor.Log($"- {farmer.displayName}: {farmer.uniqueMultiplayerID}", LogLevel.Info);
+                        ModEntry.SMonitor.Log($"- {farmer.displayName}: {farmer.UniqueMultiplayerID}", LogLevel.Info);
                     return;
                 case "give_pet":
                     if(args.Length < 2 || args.Length > 2)

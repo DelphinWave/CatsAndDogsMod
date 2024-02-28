@@ -30,7 +30,6 @@ namespace CatsAndDogsMod
         internal static IModHelper SHelper;
         internal static IManifest SModManifest;
 
-
         private static bool didPetsWarpHome = false;
 
         private static Pet newPet;
@@ -556,8 +555,9 @@ namespace CatsAndDogsMod
 
         private  void LoadCatSprites()
         {
-            string modPath = PathUtilities.NormalizePath(SHelper.DirectoryPath + "\\");
-            string catPath = PathUtilities.NormalizePath($"{modPath}assets\\cats");
+            var separator = Path.DirectorySeparatorChar;
+            string modPath = PathUtilities.NormalizePath(SHelper.DirectoryPath);
+            string catPath = PathUtilities.NormalizePath($"{modPath}{separator}assets{separator}cats");
 
             if (!Directory.Exists(catPath))
             {
@@ -568,14 +568,15 @@ namespace CatsAndDogsMod
             for(var i = 0; i < files.Length; i++)
             {
                 var relFileName = AbsoluteToRelativePath(files[i], modPath);
-                catTextureMap[(i+1).ToString()] = SHelper.Content.Load<Texture2D>(relFileName); // TODO: refactor to use filename for key
+                catTextureMap[(i+1).ToString()] = SHelper.ModContent.Load<Texture2D>(relFileName); // TODO: refactor to use filename for key
             }
         }
 
         private void LoadDogSprites()
         {
-            string modPath = PathUtilities.NormalizePath(SHelper.DirectoryPath + "\\");
-            string dogPath = PathUtilities.NormalizePath($"{modPath}assets\\dogs");
+            var separator = Path.DirectorySeparatorChar;
+            string modPath = PathUtilities.NormalizePath(SHelper.DirectoryPath);
+            string dogPath = PathUtilities.NormalizePath($"{modPath}{separator}assets{separator}dogs");
 
             if (!Directory.Exists(dogPath))
             {
@@ -587,7 +588,7 @@ namespace CatsAndDogsMod
             for (var i = 0; i < files.Length; i++)
             {
                 var relFileName = AbsoluteToRelativePath(files[i], modPath);
-                dogTextureMap[(i+1).ToString()] = SHelper.Content.Load<Texture2D>(relFileName); // TODO: refactor to use filename for key
+                dogTextureMap[(i+1).ToString()] = SHelper.ModContent.Load<Texture2D>(relFileName); // TODO: refactor to use filename for key
             }
         }
 
@@ -729,7 +730,7 @@ namespace CatsAndDogsMod
             List<Furniture> rugs = new List<Furniture>();
             foreach (Furniture house_furniture in farmHouse.furniture)
             {
-                if ((int)house_furniture.furniture_type == 12)
+                if (house_furniture.furniture_type.Equals(Furniture.rug))
                 {
                     rugs.Add(house_furniture);
                 }
