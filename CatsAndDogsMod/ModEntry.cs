@@ -16,8 +16,6 @@ using System.Linq;
 namespace CatsAndDogsMod
 {
     // TODO:
-    // - Test multiplayer
-    //   >>> handle skin id out of bounds
     // - Add In-game menu for removing pets
     // - Use better spawning location (temporarily fixed with supporting mod)
     // - Pet portrait update
