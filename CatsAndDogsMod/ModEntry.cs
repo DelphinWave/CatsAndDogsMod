@@ -75,8 +75,8 @@ namespace CatsAndDogsMod
 
             // SMAPI Commands
             helper.ConsoleCommands.Add("list_pets", "Lists the names of all pets on your farm.", CommandHandler.OnCommandReceived);
-            helper.ConsoleCommands.Add("add_cat", "Adds a cat of given breed. Breed is a number between 0-2. This will give you an in-game naming prompt.", CommandHandler.OnCommandReceived);
-            helper.ConsoleCommands.Add("add_dog", "Adds a dog of given breed. Breed is a number between 0-2. This will give you an in-game naming prompt.", CommandHandler.OnCommandReceived);
+            helper.ConsoleCommands.Add("add_cat", "Adds a cat. This will give you an in-game naming prompt.", CommandHandler.OnCommandReceived);
+            helper.ConsoleCommands.Add("add_dog", "Adds a dog. This will give you an in-game naming prompt.", CommandHandler.OnCommandReceived);
             helper.ConsoleCommands.Add("remove_pet", "Removes pet of given name from your farm.", CommandHandler.OnCommandReceived);
             helper.ConsoleCommands.Add("list_farmers", "Lists the names and Multiplayer ID of all farmers", CommandHandler.OnCommandReceived);
             helper.ConsoleCommands.Add("give_pet", "Specify pet name and farmer name that you want to give pet to", CommandHandler.OnCommandReceived);
@@ -264,7 +264,11 @@ namespace CatsAndDogsMod
                     InitializeDog();
                     ShowAdoptPetDialog("dog");
                 }
-
+                else if (Game1.player.CurrentItem.Name.Contains("Sap"))
+                {
+                    Helper.Input.Suppress(e.Button);
+                    ShowRemovePetDialog();
+                }
 
             }
         }
@@ -310,17 +314,42 @@ namespace CatsAndDogsMod
         }
 
         /// <summary>
+        /// Dialog Box for Removing a pet
+        /// </summary>
+        internal static void ShowRemovePetDialog()
+        {
+            Game1.activeClickableMenu = new ConfirmationDialog($"Would you like to remove a pet?", (who) =>
+            {
+                if (Game1.activeClickableMenu is ConfirmationDialog cd)
+                    cd.cancel();
+
+                if (Game1.activeClickableMenu == null)
+                {
+                    var petTextureMap = new Dictionary<string, Texture2D>();
+                    foreach (Pet pet in GetAllPets())
+                    {
+                        petTextureMap.Add(pet.displayName, pet.Sprite.spriteTexture);
+                    }
+
+                    Game1.activeClickableMenu = new RemovePetSelectMenu(petTextureMap);
+                }
+
+            });
+        }
+        /// <summary>
         /// Handles removing pet
         /// </summary>
         /// <param name="petName">Name of pet to be removed</param>
         internal static void RemovePet(string petName)
         {
-            Pet petToRemove = null;
+            // TODO: add dialog to confirm removing pet?
 
+            Pet petToRemove = null;
             GetAllPets().ForEach(delegate (Pet pet) {
-                if (pet.displayName.TrimEnd() == petName)
+                if (pet.displayName.TrimEnd() == petName.TrimEnd())
                     petToRemove = pet;
             });
+            SMonitor.Log($"----------", LogLevel.Info);
 
             if (petToRemove != null)
             {
