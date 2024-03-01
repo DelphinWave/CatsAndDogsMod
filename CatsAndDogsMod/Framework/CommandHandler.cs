@@ -34,7 +34,6 @@ namespace CatsAndDogsMod.Framework
             }
                 
             var petType = "unknown type";
-            var breed = 0;
             var petName = "";
             var farmerName = "";
             switch (command)
@@ -49,57 +48,11 @@ namespace CatsAndDogsMod.Framework
                     });
                     return;
                 case "add_cat":
-                    breed = 0;
-                    if(args.Length == 1)
-                    {
-                        try
-                        {
-                            breed = Int32.Parse(args[0]);
-                            if (breed < 0 || breed > 2)
-                            {
-                                ModEntry.SMonitor.Log($"{args[0]} is an invalid breed value. Must be 0, 1, or 2.", LogLevel.Error);
-                                return;
-                            }
-                        }
-                        catch
-                        {
-                            ModEntry.SMonitor.Log($"{args[0]} is an invalid breed value. Must be 0, 1, or 2.", LogLevel.Error);
-                            return;
-                        }
-                    }
-                    else if (args.Length > 1)
-                    {
-                        ModEntry.SMonitor.Log($"add_cat only takes one argument, the breed number.", LogLevel.Error);
-                        return;
-                    }
-                    ModEntry.InitializeCat(breed);
+                    ModEntry.InitializeCat();
                     ModEntry.ShowAdoptPetDialog("cat");
                     return;
                 case "add_dog":
-                    breed = 0;
-                    if (args.Length == 1)
-                    {
-                        try
-                        {
-                            breed = Int32.Parse(args[0]);
-                            if(breed < 0 || breed > 2)
-                            {
-                                ModEntry.SMonitor.Log($"{args[0]} is an invalid breed value. Must be 0, 1, or 2.", LogLevel.Error);
-                                return;
-                            }
-                        }
-                        catch
-                        {
-                            ModEntry.SMonitor.Log($"{args[0]} is an invalid breed value. Must be 0, 1, or 2.", LogLevel.Error);
-                            return;
-                        }
-                    }
-                    else if (args.Length > 1)
-                    {
-                        ModEntry.SMonitor.Log($"add_dog only takes one argument, the breed number.", LogLevel.Error);
-                        return;
-                    }
-                    ModEntry.InitializeDog(breed);
+                    ModEntry.InitializeDog();
                     ModEntry.ShowAdoptPetDialog("dog");
                     return;
                 case "remove_pet":

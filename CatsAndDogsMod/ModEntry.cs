@@ -118,7 +118,7 @@ namespace CatsAndDogsMod
 
             if (Context.IsMainPlayer)
             {
-                // to handle version change
+                // to handle version change (backwards compatibility)
                 foreach(Pet pet in GetAllPets())
                 {
                     if (!pet.modData.ContainsKey(MOD_DATA_OWNER))
@@ -207,9 +207,9 @@ namespace CatsAndDogsMod
                 PlayerAddedPetMessage message = e.ReadAs<PlayerAddedPetMessage>();
 
                 if (message.petType == "cat")
-                    InitializeCat(0);
+                    InitializeCat();
                 else
-                    InitializeDog(0);
+                    InitializeDog();
 
                 newPet.Name = message.petName;
                 newPet.displayName = message.petDisplayName;
@@ -257,13 +257,13 @@ namespace CatsAndDogsMod
                 if (Game1.player.CurrentItem.Name.Contains("Fiber"))
                 {
                     Helper.Input.Suppress(e.Button);
-                    InitializeCat(0);
+                    InitializeCat();
                     ShowAdoptPetDialog("cat");
                 }
                 else if (Game1.player.CurrentItem.Name.Contains("Wood"))
                 {
                     Helper.Input.Suppress(e.Button);
-                    InitializeDog(0);
+                    InitializeDog();
                     ShowAdoptPetDialog("dog");
                 }
 
@@ -373,13 +373,12 @@ namespace CatsAndDogsMod
         /// <summary>
         /// Initializes newPet to be a cat
         /// </summary>
-        /// <param name="breed">breed id for selecting pet texture</param>
-        internal static void InitializeCat(int breed)
+        internal static void InitializeCat()
         {
-            newPet = new Cat(0, 0, breed)
+            newPet = new Cat(0, 0, 0)
             {
-                Name = $"cat{breed}",
-                displayName = $"cat{breed}",
+                Name = $"cat",
+                displayName = $"cat",
                 Position = new Vector2(0, 0),
                 DefaultPosition = new Vector2(0, 0),
                 Breather = false,
@@ -391,13 +390,12 @@ namespace CatsAndDogsMod
         /// <summary>
         /// Initializes newPet to be a dog
         /// </summary>
-        /// <param name="breed">breed id for selecting pet texture</param>
-        internal static void InitializeDog(int breed)
+        internal static void InitializeDog()
         {
-            newPet = new Dog(0, 0, breed)
+            newPet = new Dog(0, 0, 0)
             {
-                Name = $"dog{breed}",
-                displayName = $"dog{breed}",
+                Name = $"dog",
+                displayName = $"dog",
                 Position = new Vector2(0, 0),
                 DefaultPosition = new Vector2(0, 0),
                 Breather = false,
@@ -648,17 +646,6 @@ namespace CatsAndDogsMod
             }
         }
 
-
-        /// <summary>
-        /// Helper function for getting a sprite's texture name
-        /// </summary>
-        /// <param name="pet">"cat" or "dog"</param>
-        /// <param name="breed">breed id for selecting pet texture</param>
-        /// <returns>string value for textureName</returns>
-        private static string GetPetTextureName(string pet, int breed)
-        {
-            return $"Animals\\{pet}" + ((breed == 0) ? "" : string.Concat(breed));
-        }
 
         private void HandleTeleportingPetsHomeAtNight(Farmer player)
         {
