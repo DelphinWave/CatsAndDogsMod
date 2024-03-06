@@ -1,7 +1,7 @@
 ﻿{
   "Name": "CatsAndDogsMod",
   "Author": "DellyBelly",
-  "Version": "2.1.0",
+  "Version": "2.1.1-alpha",
   "Description": "Allows you to adopt multiple cats and dogs to your farm",
   "UniqueID": "DelphinWave.CatsAndDogsMod",
   "EntryDll": "CatsAndDogsMod.dll",

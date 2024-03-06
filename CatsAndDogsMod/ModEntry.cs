@@ -349,7 +349,6 @@ namespace CatsAndDogsMod
                 if (pet.displayName.TrimEnd() == petName.TrimEnd())
                     petToRemove = pet;
             });
-            SMonitor.Log($"----------", LogLevel.Info);
 
             if (petToRemove != null)
             {
@@ -402,7 +401,7 @@ namespace CatsAndDogsMod
         /// </summary>
         internal static void InitializeCat()
         {
-            newPet = new Cat(0, 0, 0)
+            newPet = new Pet(0, 0, "0", Pet.type_cat)
             {
                 Name = $"cat",
                 displayName = $"cat",
@@ -419,7 +418,7 @@ namespace CatsAndDogsMod
         /// </summary>
         internal static void InitializeDog()
         {
-            newPet = new Dog(0, 0, 0)
+            newPet = new Pet(0, 0, "0", Pet.type_dog)
             {
                 Name = $"dog",
                 displayName = $"dog",
@@ -505,7 +504,7 @@ namespace CatsAndDogsMod
             {
                 // Send message to main player
                 SHelper.Multiplayer.SendMessage(
-                    message: new PlayerAddedPetMessage(newPet.Name, newPet.displayName, newPet.modData[MOD_DATA_OWNER], newPet.modData[MOD_DATA_SKIN_ID], newPet is Cat ? "cat" : "dog"),
+                    message: new PlayerAddedPetMessage(newPet.Name, newPet.displayName, newPet.modData[MOD_DATA_OWNER], newPet.modData[MOD_DATA_SKIN_ID], newPet.petType.Value),
                     messageType: PlayerAddedPetMessageId,
                     modIDs: new[] { SModManifest.UniqueID }
                     );
@@ -540,11 +539,11 @@ namespace CatsAndDogsMod
             if (!pet.modData.ContainsKey(MOD_DATA_SKIN_ID))
                 return;
 
-            if (pet is Cat && catTextureMap.Count > 0 && catTextureMap.ContainsKey(pet.modData[MOD_DATA_SKIN_ID]))
+            if (pet.petType.Value == Pet.type_cat && catTextureMap.Count > 0 && catTextureMap.ContainsKey(pet.modData[MOD_DATA_SKIN_ID]))
             {
                 pet.Sprite.spriteTexture = catTextureMap[pet.modData[MOD_DATA_SKIN_ID]];
             }
-            else if (pet is Dog && dogTextureMap.Count > 0 && dogTextureMap.ContainsKey(pet.modData[MOD_DATA_SKIN_ID]))
+            else if (pet.petType.Value == Pet.type_dog && dogTextureMap.Count > 0 && dogTextureMap.ContainsKey(pet.modData[MOD_DATA_SKIN_ID]))
             {
                 pet.Sprite.spriteTexture = dogTextureMap[pet.modData[MOD_DATA_SKIN_ID]];
             }
@@ -773,7 +772,7 @@ namespace CatsAndDogsMod
             if (tries < 50)
             {
                 Game1.warpCharacter(pet, farmHouse, sleepTile);
-                pet.CurrentBehavior = 1;
+                pet.CurrentBehavior = "Sleep";
             }
             else
             {

@@ -33,18 +33,15 @@ namespace CatsAndDogsMod.Framework
                 return;
             }
                 
-            var petType = "unknown type";
             var petName = "";
             var farmerName = "";
             switch (command)
             {
                 case "list_pets":
                     ModEntry.GetAllPets().ForEach(delegate (Pet pet) {
-                        if (pet is Cat) petType = "cat";
-                        if (pet is Dog) petType = "dog";
                         var owner = pet.modData.ContainsKey(ModEntry.MOD_DATA_OWNER) ? pet.modData[ModEntry.MOD_DATA_OWNER] : "unknown";
                         var skinId = pet.modData.ContainsKey(ModEntry.MOD_DATA_SKIN_ID) ? pet.modData[ModEntry.MOD_DATA_SKIN_ID] : "none";
-                        ModEntry.SMonitor.Log($"{pet.displayName}, {petType}, owner: {owner}, skinId: {skinId}", LogLevel.Info);
+                        ModEntry.SMonitor.Log($"{pet.displayName}, {pet.petType.Value}, owner: {owner}, skinId: {skinId}", LogLevel.Info);
                     });
                     return;
                 case "add_cat":
