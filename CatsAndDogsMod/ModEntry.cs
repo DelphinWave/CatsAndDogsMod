@@ -236,11 +236,12 @@ namespace CatsAndDogsMod
             if (Game1.activeClickableMenu != null)
                 return;
 
+            // TODO: needs to be updated to handle multiple pet bowls 
             bool IsPlayerNearWaterBowl()
             {
-                var petBowlPosition = (Game1.getLocationFromName("Farm") as Farm).petBowlPosition;
-                var bowlRect = new Rectangle(petBowlPosition.X - 1, petBowlPosition.Y - 1, 3, 3);
-                if (bowlRect.Contains(new Point(Game1.player.getTileX(), Game1.player.getTileY()))) // player standing near bowl
+                var petBowlPosition = (Game1.getLocationFromName("Farm") as Farm).GetStarterPetBowlLocation();
+                var bowlRect = new Rectangle((int)petBowlPosition.X - 1, (int)petBowlPosition.Y - 1, 3, 3);
+                if (bowlRect.Contains(Game1.player.Tile)) // player standing near bowl
                     return true;
                 return false;
             }
@@ -681,19 +682,19 @@ namespace CatsAndDogsMod
             if (!isPetOwner(player))
                 return;
 
-            bool isAPetOnBed = false;
+            //bool isAPetOnBed = false;
 
             foreach (Pet pet in GetAllPets())
             {
                 WarpToOwnerFarmHouse(pet);
-                if (isAPetOnBed)
-                {
-                    pet.isSleepingOnFarmerBed.Value = false;
-                    WarpPetAgain(pet);
+                //if (isAPetOnBed)
+                //{
+                //    pet.isSleepingOnFarmerBed.Value = false;
+                //    WarpPetAgain(pet);
 
-                }
-                if (pet.isSleepingOnFarmerBed.Value)
-                    isAPetOnBed = true;
+                //}
+                //if (pet.isSleepingOnFarmerBed.Value)
+                //    isAPetOnBed = true;
             }
 
             didPetsWarpHome = true;
@@ -728,62 +729,62 @@ namespace CatsAndDogsMod
         /// </summary>
         /// <param name="pet">pet to warp</param>
         /// <param name="owner">pet owner</param>
-        private void WarpPetAgain(Pet pet)
-        {
-            Farmer owner = Game1.MasterPlayer;
-            if (pet.modData[MOD_DATA_OWNER] != null)
-                if (allFarmers.ContainsKey(pet.modData[MOD_DATA_OWNER]))
-                    owner = allFarmers[pet.modData[MOD_DATA_OWNER]];
+        //private void WarpPetAgain(Pet pet)
+        //{
+        //    Farmer owner = Game1.MasterPlayer;
+        //    if (pet.modData[MOD_DATA_OWNER] != null)
+        //        if (allFarmers.ContainsKey(pet.modData[MOD_DATA_OWNER]))
+        //            owner = allFarmers[pet.modData[MOD_DATA_OWNER]];
 
-            pet.isSleepingOnFarmerBed.Value = false;
-            FarmHouse farmHouse = Utility.getHomeOfFarmer(owner);
-            Vector2 sleepTile = Vector2.Zero;
-            int tries = 0;
-            sleepTile = new Vector2(Game1.random.Next(2, farmHouse.map.Layers[0].LayerWidth - 3), Game1.random.Next(3, farmHouse.map.Layers[0].LayerHeight - 5));
-            List<Furniture> rugs = new List<Furniture>();
-            foreach (Furniture house_furniture in farmHouse.furniture)
-            {
-                if (house_furniture.furniture_type.Equals(Furniture.rug))
-                {
-                    rugs.Add(house_furniture);
-                }
-            }
+        //    pet.isSleepingOnFarmerBed.Value = false;
+        //    FarmHouse farmHouse = Utility.getHomeOfFarmer(owner);
+        //    Vector2 sleepTile = Vector2.Zero;
+        //    int tries = 0;
+        //    sleepTile = new Vector2(Game1.random.Next(2, farmHouse.map.Layers[0].LayerWidth - 3), Game1.random.Next(3, farmHouse.map.Layers[0].LayerHeight - 5));
+        //    List<Furniture> rugs = new List<Furniture>();
+        //    foreach (Furniture house_furniture in farmHouse.furniture)
+        //    {
+        //        if (house_furniture.furniture_type.Equals(Furniture.rug))
+        //        {
+        //            rugs.Add(house_furniture);
+        //        }
+        //    }
 
-            if (Game1.random.NextDouble() <= 0.30000001192092896)
-            {
-                sleepTile = Utility.PointToVector2(farmHouse.getBedSpot()) + new Vector2(0f, 2f);
-            }
-            else if (Game1.random.NextDouble() <= 0.5)
-            {
-                Furniture rug = Utility.GetRandom(rugs, Game1.random);
-                if (rug != null)
-                {
-                    sleepTile = new Vector2(rug.boundingBox.Left / 64, rug.boundingBox.Center.Y / 64);
-                }
-            }
-            for (; tries < 50; tries++)
-            {
-                if (farmHouse.canPetWarpHere(sleepTile) && farmHouse.isTileLocationTotallyClearAndPlaceable(sleepTile) && farmHouse.isTileLocationTotallyClearAndPlaceable(sleepTile + new Vector2(1f, 0f)) && !farmHouse.isTileOnWall((int)sleepTile.X, (int)sleepTile.Y))
-                {
-                    break;
-                }
-                sleepTile = new Vector2(Game1.random.Next(2, farmHouse.map.Layers[0].LayerWidth - 3), Game1.random.Next(3, farmHouse.map.Layers[0].LayerHeight - 4));
-            }
-            if (tries < 50)
-            {
-                Game1.warpCharacter(pet, farmHouse, sleepTile);
-                pet.CurrentBehavior = "Sleep";
-            }
-            else
-            {
-                pet.faceDirection(2);
-                Game1.warpCharacter(pet, "Farm", (Game1.getLocationFromName("Farm") as Farm).GetPetStartLocation());
-            }
-            pet.UpdateSleepingOnBed();
-            pet.Halt();
-            pet.Sprite.CurrentAnimation = null;
-            pet.OnNewBehavior();
-            pet.Sprite.UpdateSourceRect();
-        }
+        //    if (Game1.random.NextDouble() <= 0.30000001192092896)
+        //    {
+        //        sleepTile = Utility.PointToVector2(farmHouse.getBedSpot()) + new Vector2(0f, 2f);
+        //    }
+        //    else if (Game1.random.NextDouble() <= 0.5)
+        //    {
+        //        Furniture rug = Utility.GetRandom(rugs, Game1.random);
+        //        if (rug != null)
+        //        {
+        //            sleepTile = new Vector2(rug.boundingBox.Left / 64, rug.boundingBox.Center.Y / 64);
+        //        }
+        //    }
+        //    for (; tries < 50; tries++)
+        //    {
+        //        if (farmHouse.canPetWarpHere(sleepTile) && farmHouse.isTileLocationTotallyClearAndPlaceable(sleepTile) && farmHouse.isTileLocationTotallyClearAndPlaceable(sleepTile + new Vector2(1f, 0f)) && !farmHouse.isTileOnWall((int)sleepTile.X, (int)sleepTile.Y))
+        //        {
+        //            break;
+        //        }
+        //        sleepTile = new Vector2(Game1.random.Next(2, farmHouse.map.Layers[0].LayerWidth - 3), Game1.random.Next(3, farmHouse.map.Layers[0].LayerHeight - 4));
+        //    }
+        //    if (tries < 50)
+        //    {
+        //        Game1.warpCharacter(pet, farmHouse, sleepTile);
+        //        pet.CurrentBehavior = "Sleep";
+        //    }
+        //    else
+        //    {
+        //        pet.faceDirection(2);
+        //        Game1.warpCharacter(pet, "Farm", (Game1.getLocationFromName("Farm") as Farm).GetPetStartLocation());
+        //    }
+        //    pet.UpdateSleepingOnBed();
+        //    pet.Halt();
+        //    pet.Sprite.CurrentAnimation = null;
+        //    pet.OnNewBehavior();
+        //    pet.Sprite.UpdateSourceRect();
+        //}
     }
 }
