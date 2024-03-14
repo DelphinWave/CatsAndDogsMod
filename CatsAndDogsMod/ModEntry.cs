@@ -236,7 +236,7 @@ namespace CatsAndDogsMod
             if (Game1.activeClickableMenu != null)
                 return;
 
-            // TODO: needs to be updated to handle multiple pet bowls 
+            // TODO: needs to be updated to handle multiple pet bowls / bowls as buildings
             bool IsPlayerNearWaterBowl()
             {
                 var petBowlPosition = (Game1.getLocationFromName("Farm") as Farm).GetStarterPetBowlLocation();
@@ -247,8 +247,8 @@ namespace CatsAndDogsMod
             }
 
 
-            // Right click near water bowl
-            if (e.Button.IsActionButton() && IsPlayerNearWaterBowl())
+            // Right click near water bowl with item in hand
+            if (e.Button.IsActionButton() && IsPlayerNearWaterBowl() && Game1.player.CurrentItem != null)
             {
                 // TODO: add check for splitscreen multiplayer here?
 
